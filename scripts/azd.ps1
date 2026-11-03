@@ -203,7 +203,8 @@ function Get-CleanupDeployment {
     foreach ($item in ($all | Sort-Object { $_.properties.timestamp } -Descending)) {
         if ($item.properties.provisioningState -notin @('Succeeded', 'Failed')) { continue }
         $tags = if ($item['tags']) { $item.tags } else { @{} }
-        if (($tags['azd-env-name'] -ceq $script:Config.env -and -not $tags.ContainsKey('azd-layer-name')) -or $item.name -ceq $script:Config.env) {
+        if (($tags['azd-env-name'] -ceq $script:Config.env -and
+            (-not $tags.ContainsKey('azd-layer-name') -or $tags['azd-layer-name'] -ceq '')) -or $item.name -ceq $script:Config.env) {
             $selected = $item
             break
         }

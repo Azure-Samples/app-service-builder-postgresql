@@ -97,11 +97,13 @@ not qualify this azd route. Do not run these commands against an existing
 shared resource group, PostgreSQL server, or the previously qualified test app.
 
 Builder has **no native azd host**. [azure.yaml](azure.yaml) deliberately has no
-services. **Run the explicit preprovision bootstrap before the first `azd up`**
+services. **Run the explicit preprovision bootstrap before every `azd up`**
 as shown below: native up initialization can resolve Bicep parameters before
 entering any custom workflow. The custom workflow repeats `hooks run preprovision`,
 then runs `provision` and `hooks run predeploy`; its repeated hook is a guard,
-not a replacement for first-run bootstrap. The complete Builder deployment lives in
+not a replacement for explicit bootstrap. It also refreshes create-versus-reuse
+mode before native parameter caching so a rerun does not PUT an already
+configured Builder app. The complete Builder deployment lives in
 [scripts/azd.ps1](scripts/azd.ps1). **Use the explicit hook for redeployment,
 not `azd deploy --all`.** In the credential-isolated azd 1.29.0 fixture,
 the explicit hook executed, whereas native deploy attempted authentication
@@ -187,7 +189,7 @@ the hook rejects that drift and requires separately reviewed targeted removal.
 ### Provision, deploy, and observe
 
 ```powershell
-# Required before the FIRST up: generate guarded owner/name parameters.
+# Required before EVERY up: generate owner/name parameters and refresh reuse mode.
 azd hooks run preprovision -e shopstream-demo
 azd up -e shopstream-demo --subscription "<subscription-id>" --location "westus2"
 ```
@@ -238,14 +240,15 @@ Observe an existing receipt without source/SQL/configuration mutation using:
 pwsh -NoProfile -File scripts/azd.ps1 verify -Environment shopstream-demo
 ```
 
-For a standalone preview or infrastructure/setup command, initialize the guarded
-parameters first (native preprovision hooks run too late for first-run parameter
-resolution):
+Before **every** standalone preview or infrastructure/setup command, initialize
+the guarded parameters and refresh create-versus-reuse mode first (native
+preprovision hooks run too late for native parameter caching):
 
 ```powershell
 azd hooks run preprovision -e shopstream-demo
 azd provision --preview -e shopstream-demo --subscription "<subscription-id>" --location "westus2"
 # After reviewing the preview:
+azd hooks run preprovision -e shopstream-demo
 azd provision -e shopstream-demo --subscription "<subscription-id>" --location "westus2"
 ```
 

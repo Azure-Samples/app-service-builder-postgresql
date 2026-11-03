@@ -8,7 +8,7 @@ infra:
 workflows:
   up:
     steps:
-      # First run also needs this explicit hook BEFORE azd up's own initialization.
+      # Run this explicit hook BEFORE EVERY azd up to refresh names/reuse before native parameter caching.
       - azd: hooks run preprovision
       - azd: provision
       - azd: hooks run predeploy

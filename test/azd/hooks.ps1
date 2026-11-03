@@ -209,6 +209,9 @@ $script:Listing = @(@{ id = $script:Deployment.id; name = 'offline-generated'; t
 function Invoke-Json { return $script:Listing }
 $selected = Get-CleanupDeployment
 Check ($selected.properties.templateHash -ceq 'template') 'Tagged native deployment not selected'
+$script:Listing[0].tags['azd-layer-name'] = ''
+$selected = Get-CleanupDeployment
+Check ($selected.id -ceq $script:Deployment.id) 'Native empty root-layer tag was rejected'
 $script:Listing[0].tags['azd-layer-name'] = 'foreign-layer'
 Reject { Get-CleanupDeployment } 'No exact tagged'
 $script:Listing[0].tags.Remove('azd-layer-name')
