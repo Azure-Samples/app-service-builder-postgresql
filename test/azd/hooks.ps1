@@ -56,6 +56,23 @@ Check ($parsed[0] -ceq 'argument with spaces' -and $parsed[1] -ceq 'quote"value'
 Reject { Invoke-Tool node @('-e', 'process.exit(7)') } 'exit 7'
 Reject { Invoke-Tool node @('-e', 'setTimeout(()=>{},10000)') -Timeout 1 } 'timed out'
 
+$oldConfig = $script:Config
+$oldState = $script:State
+$script:Inputs = @{
+    AZURE_SUBSCRIPTION_ID = $oldConfig.subscription; AZURE_TENANT_ID = $oldConfig.tenant; AZURE_LOCATION = $oldConfig.location
+    PG_LOCATION = $oldConfig.pgLocation; PG_SERVER = $oldConfig.pg; ADMIN_OBJECT_ID = $oldConfig.admin; ADMIN_NAME = 'admin'
+    GITHUB_REPOSITORY = 'owner/fork'; GITHUB_REF_NAME = 'main'; GITHUB_SHA = ('a' * 40); GITHUB_ACCOUNT = 'owner'
+    BUILDER_ALLOWED_OBJECT_IDS = $oldConfig.admin; SHOPSTREAM_ALLOW_AZURE_SERVICES = 'true'; SHOPSTREAM_ENABLE_DEMO_WRITES = 'false'
+}
+function Invoke-Json { return $script:Inputs }
+$script:Environment = 'offline'
+$env:SHOPSTREAM_PUBLIC_ORIGIN = 'https://stale.invalid'
+$null = Get-Config
+Check (-not (Test-Path Env:SHOPSTREAM_PUBLIC_ORIGIN)) 'Missing optional origin became an empty configured origin instead of being removed'
+$script:Environment = $null
+$script:Config = $oldConfig
+$script:State = $oldState
+
 function Save-State { $script:Saved = $true }
 function Set-Output { param($Name, $Value) }
 function Invoke-Json { throw 'Unexpected external command in recovery fixture' }

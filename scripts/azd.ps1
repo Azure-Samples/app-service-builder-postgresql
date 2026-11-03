@@ -95,7 +95,8 @@ function Get-Config {
         'GITHUB_SHA', 'GITHUB_ACCOUNT', 'BUILDER_ALLOWED_OBJECT_IDS', 'SHOPSTREAM_ALLOW_AZURE_SERVICES',
         'SHOPSTREAM_ENABLE_DEMO_WRITES', 'SHOPSTREAM_PUBLIC_ORIGIN', 'PGDATABASE', 'PGUSER')
     foreach ($key in $keys) {
-        [Environment]::SetEnvironmentVariable($key, $(if ($values.ContainsKey($key)) { [string]$values[$key] } else { $null }))
+        if ($values.ContainsKey($key)) { [Environment]::SetEnvironmentVariable($key, [string]$values[$key]) }
+        elseif (Test-Path -LiteralPath "Env:$key") { Remove-Item -LiteralPath "Env:$key" }
     }
     $env:AZURE_ENV_NAME = $selected
     $null = Invoke-Tool node @('scripts/azd-verify.cjs', 'inputs')

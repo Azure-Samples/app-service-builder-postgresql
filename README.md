@@ -95,8 +95,9 @@ not qualify this azd route. Do not run these commands against an existing
 shared resource group, PostgreSQL server, or the previously qualified test app.
 
 Builder has **no native azd host**. [azure.yaml](azure.yaml) deliberately has no
-services. Its custom `up` workflow runs `provision` followed by
-`hooks run predeploy`; the complete Builder deployment lives in
+services. Its custom `up` workflow runs `hooks run preprovision`, then `provision`
+and `hooks run predeploy`; the first explicit hook generates required parameters
+before azd initializes Bicep. The complete Builder deployment lives in
 [scripts/azd.ps1](scripts/azd.ps1). **Use the explicit hook for redeployment,
 not `azd deploy --all`.** In the credential-isolated azd 1.29.0 fixture,
 the explicit hook executed, whereas native deploy attempted authentication
@@ -223,8 +224,18 @@ Observe an existing receipt without source/SQL/configuration mutation using:
 pwsh -NoProfile -File scripts/azd.ps1 verify -Environment shopstream-demo
 ```
 
-For infrastructure/setup only, use `azd provision -e shopstream-demo
---subscription "<subscription-id>" --location "<builder-region>"`. Deploy/down
+For a standalone preview or infrastructure/setup command, initialize the guarded
+parameters first (native preprovision hooks run too late for first-run parameter
+resolution):
+
+```powershell
+azd hooks run preprovision -e shopstream-demo
+azd provision --preview -e shopstream-demo --subscription "<subscription-id>" --location "<builder-region>"
+# After reviewing the preview:
+azd provision -e shopstream-demo --subscription "<subscription-id>" --location "<builder-region>"
+```
+
+Deploy/down
 derive their target from the explicitly validated named environment; no
 unsupported subscription flag or Azure CLI global-default change is used.
 
