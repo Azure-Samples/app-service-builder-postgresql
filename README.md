@@ -75,8 +75,10 @@ Builder activation, or deployed managed-identity connectivity. Names and
 - Node.js **24.x** and npm, Git, Azure CLI, and its Bicep component.
 - An authorized Azure subscription/tenant, PostgreSQL provisioning rights,
   and an Entra user or group authorized to administer this dedicated database.
-- Builder preview access with **Node.js compute activation** supported in the
-  chosen location; an authorized GitHub source repository.
+- Builder preview access with **Node.js compute activation** in **West US 2
+  (`westus2`), the customer target region for this sample**; an authorized GitHub
+  source repository. Use West US 2 for PostgreSQL as well. Historical East US 2
+  test deployments are internal qualification only, not a public region choice.
 - A database network path that is explicitly permitted from your workstation
   and, independently, from the deployed Builder app. A laptop connection does
   not qualify the latter.
@@ -139,8 +141,8 @@ In PowerShell 7, create a **new** environment and configure explicit targets:
 azd env new shopstream-demo
 azd env set AZURE_SUBSCRIPTION_ID "<subscription-id>"
 azd env set AZURE_TENANT_ID "<tenant-id>"
-azd env set AZURE_LOCATION "<supported-builder-region>"
-azd env set PG_LOCATION "<supported-postgresql-region>"
+azd env set AZURE_LOCATION "westus2"
+azd env set PG_LOCATION "westus2"
 azd env set PG_SERVER "asb-pg-<globally-unique-suffix>"
 azd env set ADMIN_OBJECT_ID "<bootstrap-admin-object-id>"
 azd env set ADMIN_NAME "<bootstrap-admin-upn-or-group-name>"
@@ -154,8 +156,11 @@ azd env set GITHUB_ACCOUNT "<github-login>"
 
 `AZURE_ENV_NAME` is azd's standard environment name (3-20 lowercase
 letters/digits/hyphens). The source root is fixed to `.`. `AZURE_LOCATION` and
-`PG_LOCATION` are independent; verify regional admission, quota, cost and
-permissions before provisioning. The named administrator needs existing Entra
+`PG_LOCATION` both default to and must target **West US 2** for customers; verify
+admission, quota, cost and permissions before provisioning. An operator-only
+`SAMPLE_INTERNAL_TEST_ALLOW_EASTUS2=true` override exists solely to preserve
+explicitly approved internal tests; it is not a customer region option and is
+never added to the runtime configuration. The named administrator needs existing Entra
 SQL access from the caller's reachable environment. The hook does not create
 a Cloud Shell, VM, bootstrap host, password or new Azure role assignment.
 The runtime is never the database administrator.
@@ -180,7 +185,7 @@ the hook rejects that drift and requires separately reviewed targeted removal.
 ### Provision, deploy, and observe
 
 ```powershell
-azd up -e shopstream-demo --subscription "<subscription-id>" --location "<builder-region>"
+azd up -e shopstream-demo --subscription "<subscription-id>" --location "westus2"
 ```
 
 Preprovision reviews the exact owned resource group, billable PG16/B1ms/32GiB
@@ -230,9 +235,9 @@ resolution):
 
 ```powershell
 azd hooks run preprovision -e shopstream-demo
-azd provision --preview -e shopstream-demo --subscription "<subscription-id>" --location "<builder-region>"
+azd provision --preview -e shopstream-demo --subscription "<subscription-id>" --location "westus2"
 # After reviewing the preview:
-azd provision -e shopstream-demo --subscription "<subscription-id>" --location "<builder-region>"
+azd provision -e shopstream-demo --subscription "<subscription-id>" --location "westus2"
 ```
 
 Deploy/down
@@ -293,7 +298,7 @@ export AZURE_SUBSCRIPTION_ID="<subscription-id>"
 export AZURE_TENANT_ID="<tenant-id>"
 export RG="<your-owned-devtest-resource-group>"
 export PG_SERVER="asb-pg-<globally-unique-suffix>"
-export PG_LOCATION="<postgresql-enabled-location>"
+export PG_LOCATION="westus2"
 export ADMIN_OBJECT_ID="<entra-bootstrap-admin-object-id>"
 export ADMIN_NAME="<entra-bootstrap-admin-upn-or-group-name>"
 
@@ -577,7 +582,7 @@ Set these runtime variables:
 | `ENTRA_CREDENTIAL` | `managed-identity` (also the default) |
 | `AZURE_CLIENT_ID` | Unset for system-assigned; client ID for user-assigned |
 | `SHOPSTREAM_ENABLE_DEMO_WRITES` | Unset/false initially; true only for a bounded trusted demo |
-| `SHOPSTREAM_PUBLIC_ORIGIN` | For enabled hosted writes, the exact public HTTPS origin, for example `https://your-app.app.region.builderapps.dev` |
+| `SHOPSTREAM_PUBLIC_ORIGIN` | For enabled hosted writes, the exact public HTTPS origin, for example `https://your-app.app.westus2.builderapps.dev` |
 
 Builder's proxy uses an internal routing Host, so enabled hosted browser writes
 need `SHOPSTREAM_PUBLIC_ORIGIN` set to the actual runtime URL's **origin**. Use
@@ -639,7 +644,7 @@ Graceful shutdown closes HTTP and database pools.
 ## Costs and cleanup
 
 Check [PostgreSQL pricing](https://azure.microsoft.com/pricing/details/postgresql/flexible-server/)
-for your region and agreement before provisioning. An illustrative East US 2
+for West US 2 and your agreement before provisioning. An illustrative West US 2
 retail lookup on 2026-11-03 returned **B1MS $0.017/hour** and managed storage
 **$0.115/GiB-month**: approximately **$16.09/month** for 730 compute hours and
 32 GiB, excluding excess backups, transfer, taxes, and Builder charges.

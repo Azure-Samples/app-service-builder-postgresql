@@ -3,8 +3,8 @@
 @maxLength(63)
 param serverName string
 
-@description('A location where this subscription can provision PostgreSQL Standard_B1ms.')
-param location string
+@description('Customer region: West US 2. Confirm PostgreSQL Standard_B1ms capacity in this subscription.')
+param location string = 'westus2'
 
 @description('Entra administrator object ID for bootstrap; never the web runtime identity.')
 param administratorObjectId string

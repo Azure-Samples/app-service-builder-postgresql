@@ -9,7 +9,7 @@ const oid = '33333333-3333-4333-8333-333333333333';
 const env = {
   AZURE_SUBSCRIPTION_ID: '11111111-1111-4111-8111-111111111111',
   AZURE_TENANT_ID: '22222222-2222-4222-8222-222222222222',
-  ADMIN_OBJECT_ID: oid, AZURE_ENV_NAME: 'offline', AZURE_LOCATION: 'eastus2', PG_LOCATION: 'westus2',
+  ADMIN_OBJECT_ID: oid, AZURE_ENV_NAME: 'offline', AZURE_LOCATION: 'westus2', PG_LOCATION: 'westus2',
   PG_SERVER: 'asb-pg-offline', ADMIN_NAME: 'setup-admin', GITHUB_REPOSITORY: 'owner/fork',
   GITHUB_REF_NAME: 'main', GITHUB_SHA: 'a'.repeat(40), GITHUB_ACCOUNT: 'owner',
   BUILDER_ALLOWED_OBJECT_IDS: oid,
@@ -17,6 +17,15 @@ const env = {
 test('default inputs retain read-only/no-Azure-exception opt-in and accept explicit source identity', () => {
   assert.doesNotThrow(() => validate(env));
   assert.doesNotThrow(() => validate({ ...env, SHOPSTREAM_ALLOW_AZURE_SERVICES: 'true' }));
+});
+test('customers target only West US 2; historical internal East US 2 needs an explicit strict override', () => {
+  assert.doesNotThrow(() => validate({ ...env, AZURE_LOCATION: undefined, PG_LOCATION: undefined }));
+  for (const key of ['AZURE_LOCATION', 'PG_LOCATION']) {
+    assert.throws(() => validate({ ...env, [key]: 'eastus2' }), /customer region westus2/);
+    assert.doesNotThrow(() => validate({ ...env, [key]: 'eastus2', SAMPLE_INTERNAL_TEST_ALLOW_EASTUS2: 'true' }));
+    assert.throws(() => validate({ ...env, [key]: 'northeurope', SAMPLE_INTERNAL_TEST_ALLOW_EASTUS2: 'true' }));
+  }
+  assert.throws(() => validate({ ...env, SAMPLE_INTERNAL_TEST_ALLOW_EASTUS2: 'TRUE' }));
 });
 test('reject invalid target, unsafe source, broad IP, credential/TLS and identity overrides', () => {
   for (const values of [

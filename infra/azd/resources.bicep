@@ -1,7 +1,7 @@
-param location string
+param location string = 'westus2'
 param appName string
 param createBuilderApp bool
-param postgresqlLocation string
+param postgresqlLocation string = 'westus2'
 param postgresqlServerName string
 param administratorObjectId string
 param administratorName string

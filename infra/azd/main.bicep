@@ -3,12 +3,14 @@ targetScope = 'subscription'
 @minLength(3)
 @maxLength(20)
 param environmentName string
-param location string
+@description('Customer Builder region: westus2. Other values are reserved for explicitly approved internal qualification.')
+param location string = 'westus2'
 param resourceGroupName string
 param ownerId string
 param appName string
 param createBuilderApp bool
-param postgresqlLocation string
+@description('Customer PostgreSQL region: westus2.')
+param postgresqlLocation string = 'westus2'
 param postgresqlServerName string
 param administratorObjectId string
 param administratorName string

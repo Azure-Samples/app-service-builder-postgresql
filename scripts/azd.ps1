@@ -93,10 +93,13 @@ function Get-Config {
     $keys = @('AZURE_SUBSCRIPTION_ID', 'AZURE_TENANT_ID', 'AZURE_LOCATION', 'PG_LOCATION', 'PG_SERVER',
         'ADMIN_OBJECT_ID', 'ADMIN_NAME', 'ADMIN_TYPE', 'BOOTSTRAP_IPV4', 'GITHUB_REPOSITORY', 'GITHUB_REF_NAME',
         'GITHUB_SHA', 'GITHUB_ACCOUNT', 'BUILDER_ALLOWED_OBJECT_IDS', 'SHOPSTREAM_ALLOW_AZURE_SERVICES',
-        'SHOPSTREAM_ENABLE_DEMO_WRITES', 'SHOPSTREAM_PUBLIC_ORIGIN', 'PGDATABASE', 'PGUSER')
+        'SHOPSTREAM_ENABLE_DEMO_WRITES', 'SHOPSTREAM_PUBLIC_ORIGIN', 'PGDATABASE', 'PGUSER', 'SAMPLE_INTERNAL_TEST_ALLOW_EASTUS2')
     foreach ($key in $keys) {
         if ($values.ContainsKey($key)) { [Environment]::SetEnvironmentVariable($key, [string]$values[$key]) }
         elseif (Test-Path -LiteralPath "Env:$key") { Remove-Item -LiteralPath "Env:$key" }
+    }
+    foreach ($key in @('AZURE_LOCATION', 'PG_LOCATION')) {
+        if (-not $values.ContainsKey($key)) { [Environment]::SetEnvironmentVariable($key, 'westus2') }
     }
     $env:AZURE_ENV_NAME = $selected
     $null = Invoke-Tool node @('scripts/azd-verify.cjs', 'inputs')

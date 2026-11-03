@@ -63,6 +63,7 @@ $script:Inputs = @{
     PG_LOCATION = $oldConfig.pgLocation; PG_SERVER = $oldConfig.pg; ADMIN_OBJECT_ID = $oldConfig.admin; ADMIN_NAME = 'admin'
     GITHUB_REPOSITORY = 'owner/fork'; GITHUB_REF_NAME = 'main'; GITHUB_SHA = ('a' * 40); GITHUB_ACCOUNT = 'owner'
     BUILDER_ALLOWED_OBJECT_IDS = $oldConfig.admin; SHOPSTREAM_ALLOW_AZURE_SERVICES = 'true'; SHOPSTREAM_ENABLE_DEMO_WRITES = 'false'
+    SAMPLE_INTERNAL_TEST_ALLOW_EASTUS2 = 'true'
 }
 function Invoke-Json { return $script:Inputs }
 $script:Environment = 'offline'

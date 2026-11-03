@@ -24,7 +24,10 @@ function validate(env) {
     if (!guid.test(env[key] || '')) throw new Error(`${key} must be a GUID`);
   }
   for (const key of ['AZURE_LOCATION', 'PG_LOCATION']) {
-    if (!/^[a-z][a-z0-9]+$/.test(env[key] || '')) throw new Error(`${key} is required`);
+    const region = env[key] ?? 'westus2';
+    if (region !== 'westus2' && !(region === 'eastus2' && env.SAMPLE_INTERNAL_TEST_ALLOW_EASTUS2 === 'true')) {
+      throw new Error(`${key} must target customer region westus2; other regions require the explicit approved internal-test override`);
+    }
   }
   if (!/^[a-z][a-z0-9-]{1,18}[a-z0-9]$/.test(env.AZURE_ENV_NAME || '')) throw new Error('AZURE_ENV_NAME must be 3-20 lowercase letters/digits/hyphens');
   if (!/^asb-pg-[a-z0-9-]{1,54}[a-z0-9]$/.test(env.PG_SERVER || '')) throw new Error('PG_SERVER must be a valid asb-pg-prefixed name');
@@ -39,7 +42,7 @@ function validate(env) {
       || !/^[0-9a-f]{40}$/i.test(env.GITHUB_SHA || '')
       || !/^[A-Za-z0-9][A-Za-z0-9-]*$/.test(env.GITHUB_ACCOUNT || '')) throw new Error('Explicit GitHub account/repository/branch/full SHA required');
   if (env.BOOTSTRAP_IPV4 && (!isIPv4(env.BOOTSTRAP_IPV4) || env.BOOTSTRAP_IPV4 === '0.0.0.0')) throw new Error('BOOTSTRAP_IPV4 must be one nonzero IPv4');
-  for (const key of ['SHOPSTREAM_ALLOW_AZURE_SERVICES', 'SHOPSTREAM_ENABLE_DEMO_WRITES']) {
+  for (const key of ['SHOPSTREAM_ALLOW_AZURE_SERVICES', 'SHOPSTREAM_ENABLE_DEMO_WRITES', 'SAMPLE_INTERNAL_TEST_ALLOW_EASTUS2']) {
     if (env[key] !== undefined && !['true', 'false'].includes(env[key])) throw new Error(`${key} must be true or false`);
   }
   if (env.PGDATABASE && env.PGDATABASE !== 'shopstream' || env.PGUSER && env.PGUSER !== 'shopstream_runtime') throw new Error('This fast path requires its dedicated shopstream database/runtime role');
