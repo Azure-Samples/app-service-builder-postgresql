@@ -139,6 +139,14 @@ repository authorization, organization approval and browser consent remain
 human actions. No password, GitHub token, Azure token or signed source URL
 belongs in the azd environment.
 
+**Before provisioning**, have the repository owner grant the official Builder
+GitHub App access to **your fork**, following the maintained
+[GitHub authorization requirements](https://builder.appservice.azure.com/docs/guides/source-control/#github-authorization).
+Public forks also require installation access; `builder source login github`
+does not install the App. Review the publisher, owning account and exact selected
+repositories rather than granting access to all repositories. A successful
+GitHub CLI sign-in alone does not establish Builder source access.
+
 In PowerShell 7, create a **new** environment and configure explicit targets:
 
 ```powershell
