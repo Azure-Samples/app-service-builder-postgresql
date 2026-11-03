@@ -95,6 +95,7 @@ function fixture(options = {}) {
 test('read-only SQL verification checks exact mapping, schema, admin/ownership, positive privileges and sequences', async () => {
   const client = fixture();
   await verify(client, { RUNTIME_OBJECT_ID: oid });
+  assert.ok(client.seen.some((sql) => sql.includes("has_column_privilege(oid, 'products', 'price_cents', 'UPDATE')")));
   assert.ok(client.seen.some((sql) => sql.includes('has_sequence_privilege')));
   assert.ok(client.seen.some((sql) => sql.includes('has_database_privilege')));
 });

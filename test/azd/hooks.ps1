@@ -212,8 +212,12 @@ Check ($selected.properties.templateHash -ceq 'template') 'Tagged native deploym
 $script:Listing[0].tags['azd-layer-name'] = ''
 $selected = Get-CleanupDeployment
 Check ($selected.id -ceq $script:Deployment.id) 'Native empty root-layer tag was rejected'
-$script:Listing[0].tags['azd-layer-name'] = 'foreign-layer'
-Reject { Get-CleanupDeployment } 'No exact tagged'
+$script:Listing[0].name = 'offline'
+foreach ($layer in @('foreign-layer', ' ', $null)) {
+    $script:Listing[0].tags['azd-layer-name'] = $layer
+    Reject { Get-CleanupDeployment } 'No exact tagged'
+}
+$script:Listing[0].name = 'offline-generated'
 $script:Listing[0].tags.Remove('azd-layer-name')
 $script:Deployment.properties.outputResources = @(@{ id = '/subscriptions/other/foreign' })
 Reject { Get-CleanupDeployment } 'Foreign resource'
@@ -224,6 +228,8 @@ $script:Deployment.properties.parameters.ownerId.value = $script:State.owner
 $script:Listing[0].tags['azd-env-name'] = 'other'
 Reject { Get-CleanupDeployment } 'No exact tagged'
 $script:Listing[0].name = 'offline'
+Reject { Get-CleanupDeployment } 'No exact tagged'
+$script:Listing[0].tags.Remove('azd-env-name')
 $selected = Get-CleanupDeployment
 Check ($selected.id -ceq $script:Deployment.id) 'Exact legacy native deployment not selected'
 $script:Listing[0].properties.provisioningState = 'Running'

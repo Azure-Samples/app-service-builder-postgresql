@@ -65,7 +65,7 @@ async function verify(client, env, auth = client) {
     has_schema_privilege(oid, 'public', 'CREATE') AS schema_create,
     has_table_privilege(oid, 'products', 'DELETE') AS product_delete,
     has_table_privilege(oid, 'products', 'TRUNCATE') AS product_truncate,
-    has_column_privilege(oid, 'products', 'price', 'UPDATE') AS price_update,
+    has_column_privilege(oid, 'products', 'price_cents', 'UPDATE') AS price_update,
     (SELECT pg_get_userbyid(datdba) = $1 FROM pg_database WHERE datname=current_database()) AS db_owner,
     EXISTS(SELECT 1 FROM pg_tables WHERE schemaname='public' AND tableowner=$1) AS table_owner,
     EXISTS(SELECT 1 FROM pg_namespace WHERE nspname='public' AND pg_get_userbyid(nspowner)=$1) AS schema_owner
