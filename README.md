@@ -7,8 +7,9 @@ queries run server-side using **Microsoft Entra tokens**, never a stored databas
 password. The default hosted credential is the app's system-assigned managed
 identity; local development uses Azure CLI authentication.
 
-**App Service Builder is Private Preview. This is an unauthenticated DEV/TEST
-demo, not an e-commerce production system.** Database authentication does not
+**App Service Builder is Private Preview. This is a DEV/TEST demo without
+application-level visitor authentication, not an e-commerce production system.**
+Configure Builder's visitor access policy separately. Database authentication does not
 authenticate website visitors. Writes are disabled by default. When explicitly
 enabled, every visitor can create orders, advance fulfillment, and create/delete
 demo reviews. Do not use real customer data or expose an enabled-write demo to an
@@ -20,16 +21,43 @@ workflows passed. An explicitly approved DEV/TEST Azure-services firewall
 exception enabled Azure bootstrap and least-privilege app-principal mapping.
 A hosted Node.js 24/Express deployment then activated: tester-authenticated
 `/health` and database reads passed using managed identity and verified TLS;
-anonymous root and health requests returned 401. Hosted browser writes exposed
-a public-Origin/internal-Host mismatch. The canonical-origin correction below
-has local regressions, but corrected-runtime hosted CRUD is not yet qualified.
+anonymous root and health requests returned 401. The canonical-origin correction
+below also passed hosted qualification: order creation, read-back, one-step
+fulfillment, stock decrement, persisted order-item/inventory-event rows, and
+review creation/read/deletion. Invalid orders returned 400, insufficient stock
+409, and foreign origins and web reset 403. Synthetic rows were removed and
+the exact original product values and all seed counts restored.
 The hosted test used an internal test-only source upload; **GitHub-source
 deployment is not yet qualified**. Verify your target's identity, grants,
 visitor access policy, and permitted network path independently.
 No App Service Service Connector, customer VNet integration, private endpoint
 route, or stable outbound IP contract is assumed.
 
+The 45 hosted runtime source entries match contribution commit
+`92c26510e45237af0753bb1f4b6629cdd01a9bf8`; their test source archive SHA256 is
+`d5e08379581ca1ee02f7ef4a9cea9223e5db556e77b524d017dfe4efe13d2b4e`.
+Privileged `db/` setup was validated separately against Azure and is excluded
+from the runtime artifact. Hosted persistence was checked through read-back and
+an independent database connection; post-write restart persistence was tested
+locally, not repeated in the hosted test.
+
 ## Screenshots
+
+### Hosted Azure PostgreSQL and managed identity
+
+These are actual tester-authenticated Builder runtime captures using Entra-only
+Azure PostgreSQL, the app's managed identity, and verified TLS. The order
+capture shows the temporary synthetic order after advancing it to processing;
+that order and its effects were subsequently cleaned up. Only generated demo
+names and `example.com` addresses are shown, not the signed-in tester's identity.
+
+| Workflow | Capture |
+| --- | --- |
+| Hosted dashboard after cleanup | [Hosted dashboard](docs/images/shopstream-hosted-dashboard.png) |
+| Hosted product browsing | [Hosted product catalog](docs/images/shopstream-hosted-products.png) |
+| Hosted synthetic order persisted as processing | [Hosted order workflow](docs/images/shopstream-hosted-orders.png) |
+
+### Local verified-TLS fixture
 
 These captures use the actual app with an isolated **local PostgreSQL fixture
 and verified TLS**. They do not demonstrate Azure database authentication,
@@ -104,8 +132,8 @@ Region availability is subscription-specific: a SKU listing alone is not a
 capacity guarantee.
 
 For an approved workstation connection to **this new test server only**, use
-one exact public IPv4, never `0.0.0.0`, a broad range, or “allow Azure services.”
-Do not alter an existing service's restrictions:
+one exact public IPv4, not a broad range. Do not silently substitute the
+separate Azure-services exception below or alter unrelated services:
 
 ```sh
 export BOOTSTRAP_IPV4="<approved-workstation-public-ipv4>"
@@ -116,9 +144,32 @@ az postgres flexible-server firewall-rule create --server-name "$PG_SERVER" --re
 ```
 
 **Stop if Builder cannot reach PostgreSQL under the permitted rules.** Request a
-supported preview network path from the Builder team. A private endpoint does
-not automatically connect Builder to a VNet; opening PostgreSQL to all Azure
-traffic is not a workaround.
+supported preview network path or an explicit DEV/TEST access decision. A
+private endpoint does not automatically connect Builder to a VNet.
+
+### Optional, explicitly approved DEV/TEST Azure-source access
+
+The hosted qualification used the PostgreSQL **Allow Azure services** exception,
+after explicit approval of its scope. The special `0.0.0.0`–`0.0.0.0` rule allows
+Azure-origin workloads **across subscriptions and tenants**, not just your
+Builder app or subscription. It is not an all-internet rule, but it is a broad
+network admission tradeoff, not narrow production isolation. Entra authentication,
+least-privilege SQL mapping, verified TLS, and visitor access controls remain
+required. The Bicep template does **not** create this rule.
+
+Only if that scope is approved for your dedicated demo server:
+
+```sh
+az postgres flexible-server firewall-rule create --server-name "$PG_SERVER" --resource-group "$RG" \
+  --name devtest-allow-azure-services --start-ip-address 0.0.0.0 \
+  --end-ip-address 0.0.0.0 --subscription "$AZURE_SUBSCRIPTION_ID"
+```
+
+Keep the exact workstation rule separately. Verify actual bootstrap and
+deployed app access: neither a firewall rule nor a laptop test proves hosted
+connectivity. If broad Azure-source admission is unacceptable, stop rather than
+disable TLS, use a password, make the runtime an administrator, or claim private
+networking support.
 
 ## 2. Bootstrap schema and demo data as the administrator
 
@@ -345,6 +396,9 @@ development. Browser Origin must match the configured scheme, hostname, and
 port exactly. Forwarded host/protocol headers are not trusted. This setting
 does not enable writes or authenticate visitors; keep writes disabled unless
 the demo audience is trusted and the app's access policy is appropriate.
+For tester-only validation, enforce Builder's required Entra visitor policy
+before enabling writes. Review any sign-in or application-consent prompt
+personally; database managed identity does not replace visitor access control.
 
 Choose **Save and deploy** to capture variables in a new version. **Save only**
 does not update running code. Retained versions use historical settings. Wait
@@ -380,7 +434,7 @@ for certificate verification, `rejectUnauthorized: false`, or
 | DNS/timeout | Approved network path and firewall; do not weaken restrictions to mask failure |
 | Connection resets before TLS | Investigate the permitted transport path independently of token/password selection; server Ready and matching firewall rules do not prove SQL/TLS reachability |
 | TLS certificate error | FQDN and supported trusted CA bundle; never disable verification |
-| 403 on mutations | Writes default off; foreign browser origins rejected; reset always forbidden |
+| 403 on mutations | Check the demo-write opt-in and exact SHOPSTREAM_PUBLIC_ORIGIN behind a proxy; foreign origins and web reset remain forbidden |
 | 409 | Stock, fulfillment transition, or bounded dataset limit; reconcile before retry |
 | Saved settings have no effect | Deploy a new version and verify its variables, identity, and active source |
 | Build succeeds, activation fails | Confirm Node.js compute support for this Builder target |
@@ -419,6 +473,14 @@ Remove the workstation firewall rule when no longer needed:
 ```sh
 az postgres flexible-server firewall-rule delete --server-name "$PG_SERVER" --resource-group "$RG" \
   --name bootstrap-workstation --subscription "$AZURE_SUBSCRIPTION_ID"
+```
+
+If you explicitly enabled the DEV/TEST Azure-services exception, remove that
+specific rule when finished as well. This can stop the demo's database access:
+
+```sh
+az postgres flexible-server firewall-rule delete --server-name "$PG_SERVER" --resource-group "$RG" \
+  --name devtest-allow-azure-services --subscription "$AZURE_SUBSCRIPTION_ID"
 ```
 
 Do **not** delete a shared resource group, unrelated resources, or source forks
