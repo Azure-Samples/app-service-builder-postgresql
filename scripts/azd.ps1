@@ -254,7 +254,11 @@ function Assert-Inventory {
         $databases = @(Pg-Collection databases)
         if (@($databases | Where-Object name -NotIn @('shopstream', 'postgres', 'azure_sys', 'azure_maintenance')).Count) { throw 'Unknown database on owned server' }
         $admins = @(Pg-Collection administrators)
-        if (@($admins | Where-Object { $_.name -ine $c.admin }).Count -or
+        if (@($admins | Where-Object {
+            $_['id'] -ine "$($c.pgId)/administrators/$($c.admin)" -or -not $_['properties'] -or
+            $_.properties['objectId'] -ine $c.admin -or $_.properties['tenantId'] -ine $c.tenant -or
+            $_.properties['principalType'] -ine $c.adminType -or $_.properties['principalName'] -ine $c.adminName
+        }).Count -or
             (($script:State['provisioned'] -or $Action -eq 'postprovision') -and $admins.Count -ne 1)) { throw 'Unknown/missing PostgreSQL administrator' }
     }
 }

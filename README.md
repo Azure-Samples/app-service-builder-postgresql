@@ -244,6 +244,19 @@ Deploy/down
 derive their target from the explicitly validated named environment; no
 unsupported subscription flag or Azure CLI global-default change is used.
 
+If azd cannot resolve the pinned subscription despite a successful
+`az account show --subscription "<subscription-id>"`, an existing azd account
+cache can be stale. Operators already signed in through Azure CLI can use the
+supported isolated configuration below, retaining it for **every** subsequent
+azd command in that shell. This selects existing Azure CLI credentials, not a
+new identity or permission grant; it is optional troubleshooting, not a sample
+prerequisite. Do not copy tokens or edit credential/cache files manually.
+
+```powershell
+$env:AZD_CONFIG_DIR = Join-Path (Get-Location) '.azure/azd-operator-config'
+azd config set auth.useAzCliAuth true
+```
+
 Outputs include `AZURE_RESOURCE_GROUP`, `PGHOST`, `PGDATABASE`, runtime `PGUSER`,
 `PG_SERVER_ID`, and `BUILDER_APP_NAME`, `BUILDER_APP_RESOURCE_ID`,
 `BUILDER_APP_PRINCIPAL_ID`, `BUILDER_APP_URL`, `BUILDER_APP_DEPLOYMENT_ID`,

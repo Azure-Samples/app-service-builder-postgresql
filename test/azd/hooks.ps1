@@ -70,6 +70,11 @@ $script:Environment = 'offline'
 $env:SHOPSTREAM_PUBLIC_ORIGIN = 'https://stale.invalid'
 $null = Get-Config
 Check (-not (Test-Path Env:SHOPSTREAM_PUBLIC_ORIGIN)) 'Missing optional origin became an empty configured origin instead of being removed'
+$null = $script:Inputs.Remove('AZURE_LOCATION')
+$null = $script:Inputs.Remove('PG_LOCATION')
+$null = $script:Inputs.Remove('SAMPLE_INTERNAL_TEST_ALLOW_EASTUS2')
+$defaults = Get-Config
+Check ($defaults.location -ceq 'westus2' -and $defaults.pgLocation -ceq 'westus2' -and -not (Test-Path Env:SAMPLE_INTERNAL_TEST_ALLOW_EASTUS2)) 'Named environment did not default to customer WestUS2 or retained an inherited internal override'
 $script:Environment = $null
 $script:Config = $oldConfig
 $script:State = $oldState
@@ -87,7 +92,15 @@ $script:Rules = @(
     @{ name = 'bootstrap-workstation'; properties = @{ startIpAddress = '192.0.2.1'; endIpAddress = '192.0.2.1' } },
     @{ name = 'devtest-allow-azure-services'; properties = @{ startIpAddress = '0.0.0.0'; endIpAddress = '0.0.0.0' } }
 )
-$script:Admins = @(@{ name = $script:Config.admin })
+$savedAdmin = @{
+    id = "$($script:Config.pgId)/administrators/$($script:Config.admin)"
+    name = $script:Config.adminName
+    properties = @{
+        objectId = $script:Config.admin; tenantId = $script:Config.tenant
+        principalType = $script:Config.adminType; principalName = $script:Config.adminName
+    }
+}
+$script:Admins = @($savedAdmin)
 $script:PageLink = $null
 function Invoke-Json {
     param($Tool, $Arguments)
@@ -117,7 +130,16 @@ Reject { Assert-Inventory } 'inventory is incomplete'
 $script:PageLink = $null
 $script:Admins = @()
 Reject { Assert-Inventory } 'Unknown/missing'
-$script:Admins = @(@{ name = $script:Config.admin })
+foreach ($change in @(@{ objectId = $script:Config.tenant }, @{ tenantId = $script:Config.admin },
+    @{ principalType = 'ServicePrincipal' }, @{ principalName = 'other' })) {
+    $properties = $savedAdmin.properties.Clone()
+    foreach ($key in $change.Keys) { $properties[$key] = $change[$key] }
+    $script:Admins = @(@{ id = $savedAdmin.id; name = $savedAdmin.name; properties = $properties })
+    Reject { Assert-Inventory } 'Unknown/missing PostgreSQL administrator'
+}
+$script:Admins = @(@{ id = "$($script:Config.pgId)/administrators/other"; name = $savedAdmin.name; properties = $savedAdmin.properties })
+Reject { Assert-Inventory } 'Unknown/missing PostgreSQL administrator'
+$script:Admins = @($savedAdmin)
 
 $script:Policy = @{ mode = 'required'; revision = 1; appliedRevision = 1; propagationPending = $false; primaryBrowserProvider = 'entraId'; entraId = @{
     enabled = $true; applicationMode = 'managed'; tenantIds = @($script:Config.tenant); objectIds = $script:Config.testers
