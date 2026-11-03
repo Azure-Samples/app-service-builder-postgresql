@@ -7,6 +7,27 @@ const TABLES = ['order_items', 'inventory_events', 'reviews', 'orders', 'product
 const sql = (name) => readFileSync(path.join(__dirname, name), 'utf8');
 const identifier = (value) => '"' + value.replaceAll('"', '""') + '"';
 
+function hasRuntimeMapping(rows, role, oid, type) {
+  if (!Array.isArray(rows)) throw new Error('Unsupported Entra principal metadata');
+  const principals = rows.map((row) => {
+    if (!row || typeof row !== 'object' || Array.isArray(row)) throw new Error('Unsupported Entra principal metadata');
+    const principal = Object.fromEntries(Object.entries(row).map(([key, value]) => [key.toLowerCase(), value]));
+    if (typeof principal.rolname !== 'string' || typeof principal.objectid !== 'string'
+        || typeof principal.principaltype !== 'string' || ![0, 1].includes(principal.isadmin)) {
+      throw new Error('Unsupported Entra principal metadata');
+    }
+    return principal;
+  }).filter((row) => row.rolname === role);
+  if (principals.length > 1) throw new Error('Duplicate Entra runtime principal metadata');
+  if (!principals.length) return false;
+  const mapped = principals[0];
+  if (mapped.objectid.toLowerCase() !== oid.toLowerCase()
+      || mapped.principaltype.toLowerCase() !== type || mapped.isadmin !== 0) {
+    throw new Error('Existing Entra mapping differs; refusing to replace it');
+  }
+  return true;
+}
+
 async function bootstrap(client, reset) {
   await client.query('BEGIN');
   try {
@@ -57,14 +78,7 @@ async function grant(client, env = process.env) {
   await auth.connect();
   try {
     const existing = await auth.query('SELECT * FROM pgaadauth_list_principals(FALSE)');
-    const mapped = existing.rows.map((row) => Object.fromEntries(
-      Object.entries(row).map(([key, value]) => [key.toLowerCase(), value])
-    )).find((row) => row.rolename === role);
-    if (mapped) {
-      if (mapped.objectid?.toLowerCase() !== oid.toLowerCase() || mapped.principaltype?.toLowerCase() !== type || mapped.isadmin) {
-        throw new Error('Existing Entra mapping differs; refusing to replace it');
-      }
-    } else {
+    if (!hasRuntimeMapping(existing.rows, role, oid, type)) {
       await auth.query('SELECT * FROM pgaadauth_create_principal_with_oid($1, $2, $3, FALSE, FALSE)', [role, oid, type]);
     }
   } finally { await auth.end(); }
@@ -117,4 +131,4 @@ if (require.main === module) {
     process.exitCode = 1;
   });
 }
-module.exports = { bootstrap, grant };
+module.exports = { bootstrap, grant, hasRuntimeMapping };
