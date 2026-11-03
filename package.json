@@ -12,7 +12,8 @@
     "db:reset": "node db/setup.js reset",
     "db:grant": "node db/setup.js grant",
     "test": "node --test test/*.test.js",
-    "test:integration": "node --test test/integration/*.test.js"
+    "test:integration": "node --test test/integration/*.test.js",
+    "test:azd": "node --test test/azd/*.test.js && pwsh -NoLogo -NoProfile -File test/azd/hooks.ps1"
   },
   "dependencies": {
     "@azure/identity": "^4.14.1",

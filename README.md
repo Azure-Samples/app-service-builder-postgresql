@@ -86,6 +86,186 @@ See the maintained [manifest reference](https://builder.appservice.azure.com/doc
 [managed identity guide](https://builder.appservice.azure.com/docs/guides/managed-identity/),
 and [service connection checklist](https://builder.appservice.azure.com/docs/guides/connect-to-services/).
 
+## Optional: quick setup with azd
+
+This additional route is **implemented and locally validated, but not yet
+qualified against live GitHub-source Builder deployment**. The manual route
+below remains available. Historical hosted source-upload evidence above does
+not qualify this azd route. Do not run these commands against an existing
+shared resource group, PostgreSQL server, or the previously qualified test app.
+
+Builder has **no native azd host**. [azure.yaml](azure.yaml) deliberately has no
+services. Its custom `up` workflow runs `provision` followed by
+`hooks run predeploy`; the complete Builder deployment lives in
+[scripts/azd.ps1](scripts/azd.ps1). **Use the explicit hook for redeployment,
+not `azd deploy --all`.** In the credential-isolated azd 1.29.0 fixture,
+the explicit hook executed, whereas native deploy attempted authentication
+before its hooks. The fixture rejected all network traffic locally; it did
+not contact Azure or demonstrate cloud provisioning.
+
+### Tools, identity, and explicit inputs
+
+In addition to the prerequisites above, install azd **1.29.0 or later**,
+**PowerShell 7.4 or later** (also on macOS/Linux), GitHub CLI, and a compatible
+[published Builder preview CLI](https://builder.appservice.azure.com/docs/reference/builder-cli/).
+The hooks check needed CLI capabilities, not just its version stamp: GitHub
+source connect, full-commit/request-ID deployment, operation status, and
+served-version provenance. They never install or upgrade the CLI. Local checks
+used Node 24.8.0, Azure CLI 2.87.0/Bicep 0.46.1, azd 1.29.0, PowerShell 7.5.2,
+and GitHub CLI 2.102.1 on macOS. A Windows execution is still required before
+claiming Windows qualification.
+
+Fork and clone this sample, push the branch/commit you intend Builder to build,
+and run `npm ci` in the repository root. Azure CLI, azd, Builder, and GitHub have
+separate authentication stores. Sign in interactively as needed:
+
+```powershell
+azd auth login --tenant-id "<tenant-id>"
+az login --tenant "<tenant-id>"
+builder login --tenant "<tenant-id>"
+builder source login github --account "<github-login>"
+```
+
+Select the same GitHub account in GitHub CLI; the hook refuses an active-account
+mismatch rather than silently switching accounts. GitHub App installation,
+repository authorization, organization approval and browser consent remain
+human actions. No password, GitHub token, Azure token or signed source URL
+belongs in the azd environment.
+
+In PowerShell 7, create a **new** environment and configure explicit targets:
+
+```powershell
+azd env new shopstream-demo
+azd env set AZURE_SUBSCRIPTION_ID "<subscription-id>"
+azd env set AZURE_TENANT_ID "<tenant-id>"
+azd env set AZURE_LOCATION "<supported-builder-region>"
+azd env set PG_LOCATION "<supported-postgresql-region>"
+azd env set PG_SERVER "asb-pg-<globally-unique-suffix>"
+azd env set ADMIN_OBJECT_ID "<bootstrap-admin-object-id>"
+azd env set ADMIN_NAME "<bootstrap-admin-upn-or-group-name>"
+azd env set ADMIN_TYPE "User" # or Group
+azd env set BUILDER_ALLOWED_OBJECT_IDS "<tester-object-id>,<optional-second-tester-object-id>"
+azd env set GITHUB_REPOSITORY "<owner>/<fork>"
+azd env set GITHUB_REF_NAME "<pushed-branch>"
+azd env set GITHUB_SHA "<full-reviewed-40-character-pushed-commit>"
+azd env set GITHUB_ACCOUNT "<github-login>"
+```
+
+`AZURE_ENV_NAME` is azd's standard environment name (3-20 lowercase
+letters/digits/hyphens). The source root is fixed to `.`. `AZURE_LOCATION` and
+`PG_LOCATION` are independent; verify regional admission, quota, cost and
+permissions before provisioning. The named administrator needs existing Entra
+SQL access from the caller's reachable environment. The hook does not create
+a Cloud Shell, VM, bootstrap host, password or new Azure role assignment.
+The runtime is never the database administrator.
+
+**Network decision:** this fast path requires explicit DEV/TEST opt-in to the
+PostgreSQL Azure-services exception. It admits Azure-origin workloads **across
+subscriptions and tenants**, not just your Builder app. It is not an
+all-internet rule or production isolation. Set the following only after reviewing
+and accepting that scope; the default is false and the hook otherwise stops:
+
+```powershell
+azd env set SHOPSTREAM_ALLOW_AZURE_SERVICES true
+# If needed for the existing administrator's workstation, approve ONE exact IP:
+azd env set BOOTSTRAP_IPV4 "<approved-nonzero-public-ipv4>"
+```
+
+The administrator must actually be reachable under the approved rules.
+If not, setup stops without a deployment or another network workaround.
+Disabling a Bicep condition does not remove a previously created firewall rule;
+the hook rejects that drift and requires separately reviewed targeted removal.
+
+### Provision, deploy, and observe
+
+```powershell
+azd up -e shopstream-demo --subscription "<subscription-id>" --location "<builder-region>"
+```
+
+Preprovision reviews the exact owned resource group, billable PG16/B1ms/32GiB
+dependency, setup administrator and broad network rule. Bicep creates only that
+new dedicated group, Entra-only PG and source-less system-identity Builder app.
+Postprovision applies a required tenant-and-object-ID tester policy, runs the
+existing idempotent schema/seed bootstrap and nonadmin principal grants, and
+verifies them. Predeploy reviews GitHub credential transfer and the full source
+commit, saves nonsecret runtime configuration, submits one request-ID-bound
+deployment, resumes its operation, and checks active-version GitHub provenance.
+Existing schemas are not reset, and ambiguous source/deployment outcomes are
+never blindly retried.
+
+The hook preserves verified TLS, runtime least privilege and tester-only
+access. **Demo writes remain false.** If intentionally opting in later, set
+`SHOPSTREAM_ENABLE_DEMO_WRITES=true` and `SHOPSTREAM_PUBLIC_ORIGIN` to the exact
+actual HTTPS `BUILDER_APP_URL` origin, without a trailing slash/path. An invalid
+or mismatched origin stops before deployment; forwarded headers are not trusted.
+
+Successful rollout is **not** authenticated SQL health or CRUD qualification.
+The hook exports separate stage statuses and ends with exit **3** when protected
+health requires browser verification: `Deployment=Succeeded`,
+`BUILDER_HEALTH_STATUS=AwaitingInteractiveVerification`,
+`SHOPSTREAM_CRUD_STATUS=NotRun`. Sign in as an allowed tester, handle any consent
+yourself, and verify `/health`, seeded reads and the validation steps below.
+Do not weaken the visitor policy or copy browser cookies into scripts.
+
+Redeploy a deliberately reviewed source/configuration change using:
+
+```powershell
+azd hooks run predeploy -e shopstream-demo
+```
+
+A pending operation is observed first. Repeating the same completed `GITHUB_SHA`
+is observe-only, even if local configuration changed; applying new configuration
+requires an explicitly reviewed different pushed commit. It never silently
+reconfigures or redeploys a completed commit.
+Observe an existing receipt without source/SQL/configuration mutation using:
+
+```powershell
+pwsh -NoProfile -File scripts/azd.ps1 verify -Environment shopstream-demo
+```
+
+For infrastructure/setup only, use `azd provision -e shopstream-demo
+--subscription "<subscription-id>" --location "<builder-region>"`. Deploy/down
+derive their target from the explicitly validated named environment; no
+unsupported subscription flag or Azure CLI global-default change is used.
+
+Outputs include `AZURE_RESOURCE_GROUP`, `PGHOST`, `PGDATABASE`, runtime `PGUSER`,
+`PG_SERVER_ID`, and `BUILDER_APP_NAME`, `BUILDER_APP_RESOURCE_ID`,
+`BUILDER_APP_PRINCIPAL_ID`, `BUILDER_APP_URL`, `BUILDER_APP_DEPLOYMENT_ID`,
+`BUILDER_APP_VERSION_ID`. Separate stage outputs are
+`SHOPSTREAM_DATABASE_SETUP_STATUS` (administrator-side schema/grant check, not
+deployed SQL health), `BUILDER_SOURCE_STATUS`, `BUILDER_DEPLOYMENT_STATUS`, `BUILDER_AUTH_STATUS`,
+`BUILDER_HEALTH_STATUS`, `SHOPSTREAM_VERIFICATION_STATUS` and
+`SHOPSTREAM_CRUD_STATUS`. Preserve `.azure/<environment>/shopstream-state.json`
+and azd's local environment: they contain nonsecret ownership/source/operation
+receipts needed for recovery and guarded cleanup. Do not publish private
+environment identities or receipts.
+
+### Cleanup and local checks
+
+`azd down -e shopstream-demo` is a **separate destructive decision**. It deletes
+the entire newly owned group/app/PostgreSQL server, including SQL roles, seed
+and any added data. Predown verifies the exact saved latest terminal azd
+deployment/template hash, recursively allowlists nested deployment resources,
+checks actual group/database/firewall inventory, and requires a typed
+confirmation before native azd's deletion prompt. Missing receipts, changed
+ownership, foreign resources, unresolved rollout or ambiguous deployment
+discovery block cleanup. Do not use `--force`, `--purge`, skip hooks, or aim it
+at a shared group. Partial provisioning with unverifiable deployment metadata
+requires reviewed exact-resource recovery instead.
+
+App deletion alone leaves PostgreSQL and its principal mapping behind.
+This route does not delete your fork, uninstall a GitHub App, clear credentials,
+or clean roles on an external/retained database.
+
+`npm test` covers existing behavior; `npm run test:azd` adds actual isolated azd
+hook execution, input/SQL fixtures and mocked PowerShell ownership, native
+process, authorization and operation-recovery checks. Local Bicep compilation
+has preview resource-metadata warnings; it does not replace provider validation.
+**Still required before live qualification:** fresh approved target/quota/cost/
+permissions and what-if, reachable Entra bootstrap, actual GitHub authorization,
+deployment, active-source provenance, tester SSO, SQL health and separately
+approved reversible CRUD/persistence/cleanup. None was executed by local tests.
+
 ## 1. Provision the database dependency
 
 Use a new, dedicated PostgreSQL server and database. The template creates

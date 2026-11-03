@@ -1,0 +1,38 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/azure-dev-cli_1.29.0/schemas/v1.0/azure.yaml.json
+name: app-service-builder-postgresql
+requiredVersions:
+  azd: ">=1.29.0"
+infra:
+  provider: bicep
+  path: infra/azd
+workflows:
+  up:
+    steps:
+      - azd: provision
+      - azd: hooks run predeploy
+hooks:
+  preprovision:
+    shell: pwsh
+    interactive: true
+    continueOnError: false
+    run: ./scripts/azd.ps1 preprovision
+  postprovision:
+    shell: pwsh
+    interactive: true
+    continueOnError: false
+    run: ./scripts/azd.ps1 postprovision
+  predeploy:
+    shell: pwsh
+    interactive: true
+    continueOnError: false
+    run: ./scripts/azd.ps1 predeploy
+  predown:
+    shell: pwsh
+    interactive: true
+    continueOnError: false
+    run: ./scripts/azd.ps1 predown
+  postdown:
+    shell: pwsh
+    interactive: true
+    continueOnError: false
+    run: ./scripts/azd.ps1 postdown

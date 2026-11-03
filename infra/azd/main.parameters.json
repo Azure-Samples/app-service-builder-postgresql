@@ -1,0 +1,19 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "environmentName": { "value": "${AZURE_ENV_NAME}" },
+    "location": { "value": "${AZURE_LOCATION}" },
+    "resourceGroupName": { "value": "${AZURE_RESOURCE_GROUP}" },
+    "ownerId": { "value": "${SHOPSTREAM_OWNER_ID}" },
+    "appName": { "value": "${BUILDER_APP_NAME}" },
+    "createBuilderApp": { "value": "${SHOPSTREAM_CREATE_APP=true}" },
+    "postgresqlLocation": { "value": "${PG_LOCATION}" },
+    "postgresqlServerName": { "value": "${PG_SERVER}" },
+    "administratorObjectId": { "value": "${ADMIN_OBJECT_ID}" },
+    "administratorName": { "value": "${ADMIN_NAME}" },
+    "administratorType": { "value": "${ADMIN_TYPE=User}" },
+    "bootstrapIpv4": { "value": "${BOOTSTRAP_IPV4=}" },
+    "allowAzureServices": { "value": "${SHOPSTREAM_ALLOW_AZURE_SERVICES=false}" }
+  }
+}
