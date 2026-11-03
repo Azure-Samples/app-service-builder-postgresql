@@ -14,18 +14,18 @@ enabled, every visitor can create orders, advance fulfillment, and create/delete
 demo reviews. Do not use real customer data or expose an enabled-write demo to an
 untrusted audience.
 
-**Qualification (2026-11-03):** twelve unit tests, local PostgreSQL SQL CRUD/
+**Qualification (2026-11-03):** twenty unit tests, local PostgreSQL SQL CRUD/
 persistence/privilege checks over verified TLS, frontend packaging, and Edge UI
-workflows passed. A hosted custom build succeeded on Node.js 24 with Express
-framework detection. Its subsequent startup readiness check timed out
-(`started=True`, `ready=False`, `AppStartupFailed`); no active runtime was
-established. The exact startup cause remains unconfirmed. Separately, Azure
-PostgreSQL provisioning and local Entra token acquisition succeeded, but the
-workstation database connection reset before TLS, preventing cloud bootstrap
-and Entra SQL mapping. These are **not** deployed managed-identity or
-app-to-database qualification. Verify activation, identity delivery, SQL
-permissions, sign-in, and the permitted network path on your own preview target
-before calling the sample deployed.
+workflows passed. An explicitly approved DEV/TEST Azure-services firewall
+exception enabled Azure bootstrap and least-privilege app-principal mapping.
+A hosted Node.js 24/Express deployment then activated: tester-authenticated
+`/health` and database reads passed using managed identity and verified TLS;
+anonymous root and health requests returned 401. Hosted browser writes exposed
+a public-Origin/internal-Host mismatch. The canonical-origin correction below
+has local regressions, but corrected-runtime hosted CRUD is not yet qualified.
+The hosted test used an internal test-only source upload; **GitHub-source
+deployment is not yet qualified**. Verify your target's identity, grants,
+visitor access policy, and permitted network path independently.
 No App Service Service Connector, customer VNet integration, private endpoint
 route, or stable outbound IP contract is assumed.
 
@@ -261,6 +261,8 @@ To exercise mutations in this isolated demo, stop the server, add
 `SHOPSTREAM_ENABLE_DEMO_WRITES=true` to `.env`, and restart. Orders exposes
 **Place Test Order** and one-step fulfillment actions; product details exposes
 review creation/deletion. Errors are displayed rather than reported as success.
+Leave `SHOPSTREAM_PUBLIC_ORIGIN` unset for direct local development: browser
+origins must match the request's actual scheme, host, and port.
 
 An API-level CRUD/persistence walkthrough (requires opt-in writes):
 
@@ -333,6 +335,16 @@ Set these runtime variables:
 | `ENTRA_CREDENTIAL` | `managed-identity` (also the default) |
 | `AZURE_CLIENT_ID` | Unset for system-assigned; client ID for user-assigned |
 | `SHOPSTREAM_ENABLE_DEMO_WRITES` | Unset/false initially; true only for a bounded trusted demo |
+| `SHOPSTREAM_PUBLIC_ORIGIN` | For enabled hosted writes, the exact public HTTPS origin, for example `https://your-app.app.region.builderapps.dev` |
+
+Builder's proxy uses an internal routing Host, so enabled hosted browser writes
+need `SHOPSTREAM_PUBLIC_ORIGIN` set to the actual runtime URL's **origin**. Use
+no trailing slash, path, query, fragment, credentials, or wildcard. Invalid
+configuration fails explicitly at startup; HTTP is accepted only for loopback
+development. Browser Origin must match the configured scheme, hostname, and
+port exactly. Forwarded host/protocol headers are not trusted. This setting
+does not enable writes or authenticate visitors; keep writes disabled unless
+the demo audience is trusted and the app's access policy is appropriate.
 
 Choose **Save and deploy** to capture variables in a new version. **Save only**
 does not update running code. Retained versions use historical settings. Wait
