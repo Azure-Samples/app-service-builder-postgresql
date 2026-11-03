@@ -54,10 +54,15 @@ function Invoke-Tool {
     } finally { $process.Dispose() }
 }
 
-function Invoke-Json([string] $Tool, [string[]] $Arguments, [int] $Timeout = 60) {
-    $result = Invoke-Tool $Tool $Arguments -Timeout $Timeout
-    try { return ConvertFrom-Json -InputObject $result.output -AsHashtable -ErrorAction Stop }
+function Invoke-Json([string] $Tool, [string[]] $Arguments, [int] $Timeout = 60, [switch] $AllowTerminalFailure) {
+    $result = Invoke-Tool $Tool $Arguments -Timeout $Timeout -AllowFailure:$AllowTerminalFailure
+    try { $parsed = ConvertFrom-Json -InputObject $result.output -AsHashtable -ErrorAction Stop }
     catch { throw "$Tool returned invalid JSON; no operation may be assumed complete" }
+    if ($result.code -ne 0 -and
+        (-not ($parsed -is [Collections.IDictionary]) -or $parsed['status'] -notin @('Failed', 'Canceled'))) {
+        throw "$Tool failed (exit $($result.code)) without a terminal failure result; no automatic retry"
+    }
+    return $parsed
 }
 
 function Digest($Value) {
@@ -354,12 +359,19 @@ function Complete-Operation {
     if ($op['status'] -in @('Failed', 'Canceled')) { throw 'Previous rollout failed/canceled; review it before a deliberate new attempt' }
     if ($op['status'] -cne 'Succeeded') {
         $status = Invoke-Json builder @('app', 'status', $op.url, '--subscription', $script:Config.subscription,
-            '--tenant', $script:Config.tenant, '--wait', '--json') -Timeout 1200
+            '--tenant', $script:Config.tenant, '--wait', '--json') -Timeout 1200 -AllowTerminalFailure
         if ($status.status -notin @('Succeeded', 'Failed', 'Canceled')) { throw 'Rollout is not terminal; receipt retained for observation only' }
         $op['status'] = $status.status
+        if ($status['error'] -is [Collections.IDictionary] -and
+            [string]$status.error['code'] -cmatch '^[A-Za-z][A-Za-z0-9._-]{0,127}$') {
+            $op['errorCode'] = [string]$status.error['code']
+        }
         Save-State
         Set-Output BUILDER_DEPLOYMENT_STATUS $status.status
-        if ($status.status -cne 'Succeeded') { throw 'Builder rollout failed/canceled; no automatic retry' }
+        if ($status.status -cne 'Succeeded') {
+            $detail = if ($op['errorCode']) { " ($($op.errorCode))" } else { '' }
+            throw "Builder rollout $($status.status)$detail; no automatic retry"
+        }
     }
     $app = (Get-App).body
     if ($app.properties.runtime.activeDeploymentId -cne $op.deploymentId -or -not $app.properties.runtime.activeAppVersionId) { throw 'Serving deployment differs from accepted operation' }

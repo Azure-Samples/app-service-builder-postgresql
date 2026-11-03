@@ -225,12 +225,17 @@ actual HTTPS `BUILDER_APP_URL` origin, without a trailing slash/path. An invalid
 or mismatched origin stops before deployment; forwarded headers are not trusted.
 
 Successful rollout is **not** authenticated SQL health or CRUD qualification.
-The hook exports separate stage statuses and ends with exit **3** when protected
+The PowerShell hook exports separate stage statuses and ends with exit **3** when protected
 health requires browser verification: `Deployment=Succeeded`,
 `BUILDER_HEALTH_STATUS=AwaitingInteractiveVerification`,
 `SHOPSTREAM_CRUD_STATUS=NotRun`. Sign in as an allowed tester, handle any consent
 yourself, and verify `/health`, seeded reads and the validation steps below.
 Do not weaken the visitor policy or copy browser cookies into scripts.
+
+In the live azd **1.29.0** test, `azd hooks run predeploy` wrapped this child
+exit 3 as outer exit **1**. Inspect the stage outputs and saved operation rather
+than treating the outer exit alone as rollout failure or readiness. A succeeded
+rollout awaiting browser verification must not be redeployed to finish sign-in.
 
 Redeploy a deliberately reviewed source/configuration change using:
 
@@ -242,6 +247,9 @@ A pending operation is observed first. Repeating the same completed `GITHUB_SHA`
 is observe-only, even if local configuration changed; applying new configuration
 requires an explicitly reviewed different pushed commit. It never silently
 reconfigures or redeploys a completed commit.
+Terminal failure/cancellation from native `builder app status --json` is
+journaled even when that command exits nonzero; a bounded service error code is
+retained when available. Failed operations stop for review, not automatic retry.
 Observe an existing receipt without source/SQL/configuration mutation using:
 
 ```powershell

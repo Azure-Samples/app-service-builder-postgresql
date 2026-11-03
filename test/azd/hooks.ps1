@@ -71,6 +71,15 @@ $parsed = $native.output | ConvertFrom-Json
 Check ($parsed[0] -ceq 'argument with spaces' -and $parsed[1] -ceq 'quote"value') 'Native argument forwarding corrupted'
 Reject { Invoke-Tool node @('-e', 'process.exit(7)') } 'exit 7'
 Reject { Invoke-Tool node @('-e', 'setTimeout(()=>{},10000)') -Timeout 1 } 'timed out'
+$failedStatus = @('-e', 'console.log(JSON.stringify({status:"Failed",error:{code:"AppRuntimeIdentityMismatch"}}));process.exit(1)')
+Reject { Invoke-Json node $failedStatus } 'exit 1'
+$parsedStatus = Invoke-Json node $failedStatus -AllowTerminalFailure
+Check ($parsedStatus.status -ceq 'Failed' -and $parsedStatus.error.code -ceq 'AppRuntimeIdentityMismatch') 'Terminal CLI failure details were lost'
+$parsedStatus = Invoke-Json node @('-e', 'console.log(JSON.stringify({status:"Canceled"}));process.exit(1)') -AllowTerminalFailure
+Check ($parsedStatus.status -ceq 'Canceled') 'Terminal CLI cancellation was lost'
+Reject { Invoke-Json node @('-e', 'console.log(JSON.stringify({status:"Succeeded"}));process.exit(1)') -AllowTerminalFailure } 'without a terminal failure'
+Reject { Invoke-Json node @('-e', 'console.log(JSON.stringify({error:"unavailable"}));process.exit(1)') -AllowTerminalFailure } 'without a terminal failure'
+Reject { Invoke-Json node @('-e', 'console.log("not JSON");process.exit(1)') -AllowTerminalFailure } 'invalid JSON'
 
 $oldConfig = $script:Config
 $oldState = $script:State
@@ -205,16 +214,23 @@ Reject { Verify-Health } 'unexpected HTTP 200'
 
 $script:State.operation = @{ status = 'Accepted'; url = "https://management.azure.com/subscriptions/$($script:Config.subscription)/operation/offline"; deploymentId = 'dep_offline'; sha = ('a' * 40) }
 $script:Polls = 0
+$script:ObservedStatus = @{ status = 'Succeeded' }
 function Invoke-Tool { return @{ output = 'Usage: builder app version show <name>' } }
 function Invoke-Json {
     param($Tool, $Arguments)
-    if ($Arguments -contains 'status') { $script:Polls++; return @{ status = 'Succeeded' } }
+    if ($Arguments -contains 'status') { $script:Polls++; return $script:ObservedStatus }
     return @{ status = 'ready'; source = @{ provider = 'github'; revision = ('a' * 40) } }
 }
 Complete-Operation
 Check ($script:State.operation.status -ceq 'Succeeded') 'Accepted operation not resumed'
 Complete-Operation
 Check ($script:Polls -eq 1) 'Succeeded operation was unnecessarily repolled or readmitted'
+$script:State.operation.status = 'Accepted'
+$script:ObservedStatus = @{ status = 'Failed'; error = @{ code = 'AppRuntimeIdentityMismatch' } }
+Reject { Complete-Operation } 'Builder rollout Failed.*AppRuntimeIdentityMismatch'
+Check ($script:State.operation.status -ceq 'Failed' -and $script:State.operation.errorCode -ceq 'AppRuntimeIdentityMismatch') 'Terminal failure was not journaled'
+Reject { Complete-Operation } 'Previous rollout failed/canceled'
+Check ($script:Polls -eq 2) 'Failed operation was unnecessarily repolled or readmitted'
 
 $script:Deployment = @{ id = '/subscriptions/11111111-1111-4111-8111-111111111111/providers/Microsoft.Resources/deployments/offline'; properties = @{
     parameters = @{ ownerId = @{ value = $script:State.owner }; resourceGroupName = @{ value = 'rg-offline' }; environmentName = @{ value = 'offline' } }
