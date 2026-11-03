@@ -43,12 +43,28 @@ $script:Checks++
 $app = @{ properties = @{ sourceIntegrationState = 'Configured'; source = @{ provider = 'github'; id = '123'; displayName = 'owner/fork'; reference = 'main'; rootDirectory = '.'; autoDeploy = $false } } }
 Assert-Source $app '123'
 $script:Checks++
-foreach ($change in @(@{ id = '456' }, @{ reference = 'other' }, @{ rootDirectory = 'other' }, @{ autoDeploy = $true })) {
+foreach ($rootDirectory in @('', $null)) {
+    $app.properties.source.rootDirectory = $rootDirectory
+    Assert-Source $app '123'
+    $script:Checks++
+}
+$app.properties.source.rootDirectory = '.'
+$source = $app.properties.source.Clone()
+$app.properties.source.Remove('rootDirectory')
+$app.properties.source.Remove('autoDeploy')
+Assert-Source $app '123'
+$script:Checks++
+$app.properties.source = $source
+foreach ($change in @(@{ id = '456' }, @{ reference = 'other' }, @{ rootDirectory = 'other' },
+    @{ rootDirectory = ' ' }, @{ autoDeploy = $true })) {
     $source = $app.properties.source.Clone()
     foreach ($key in $change.Keys) { $app.properties.source[$key] = $change[$key] }
     Reject { Assert-Source $app '123' } 'Source|Automatic'
     $app.properties.source = $source
 }
+$app.properties.sourceIntegrationState = 'Pending'
+Reject { Assert-Source $app '123' } 'Source'
+$app.properties.sourceIntegrationState = 'Configured'
 
 $native = Invoke-Tool node @('-e', 'console.log(JSON.stringify(process.argv.slice(1)))', 'argument with spaces', 'quote"value')
 $parsed = $native.output | ConvertFrom-Json

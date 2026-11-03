@@ -329,7 +329,7 @@ function Assert-Source($App, [string] $RepositoryId) {
     $source = $App.properties.source
     if (-not $source -or $source.provider -ine 'github' -or $source.id -cne $RepositoryId -or
         $source.displayName -ine $script:Config.repository -or $source.reference -cne $script:Config.branch -or
-        $source.rootDirectory -notin @('', '.', $null) -or $App.properties.sourceIntegrationState -cne 'Configured') { throw 'Source is not an exact authorized repository/branch/root match' }
+        $source['rootDirectory'] -notin @('', '.', $null) -or $App.properties.sourceIntegrationState -cne 'Configured') { throw 'Source is not an exact authorized repository/branch/root match' }
     if ($source['autoDeploy'] -eq $true) { throw 'Automatic source deployment must be reviewed and disabled before this controlled workflow' }
 }
 
