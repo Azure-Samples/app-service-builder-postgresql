@@ -97,9 +97,11 @@ not qualify this azd route. Do not run these commands against an existing
 shared resource group, PostgreSQL server, or the previously qualified test app.
 
 Builder has **no native azd host**. [azure.yaml](azure.yaml) deliberately has no
-services. Its custom `up` workflow runs `hooks run preprovision`, then `provision`
-and `hooks run predeploy`; the first explicit hook generates required parameters
-before azd initializes Bicep. The complete Builder deployment lives in
+services. **Run the explicit preprovision bootstrap before the first `azd up`**
+as shown below: native up initialization can resolve Bicep parameters before
+entering any custom workflow. The custom workflow repeats `hooks run preprovision`,
+then runs `provision` and `hooks run predeploy`; its repeated hook is a guard,
+not a replacement for first-run bootstrap. The complete Builder deployment lives in
 [scripts/azd.ps1](scripts/azd.ps1). **Use the explicit hook for redeployment,
 not `azd deploy --all`.** In the credential-isolated azd 1.29.0 fixture,
 the explicit hook executed, whereas native deploy attempted authentication
@@ -185,8 +187,15 @@ the hook rejects that drift and requires separately reviewed targeted removal.
 ### Provision, deploy, and observe
 
 ```powershell
+# Required before the FIRST up: generate guarded owner/name parameters.
+azd hooks run preprovision -e shopstream-demo
 azd up -e shopstream-demo --subscription "<subscription-id>" --location "westus2"
 ```
+
+If up unexpectedly prompts for `appName`, `ownerId` or another derived
+infrastructure parameter, cancel rather than inventing a value. Run the
+explicit preprovision bootstrap for the same named environment, then rerun up.
+Do not delete its ownership receipt or adopt existing/shared resources.
 
 Preprovision reviews the exact owned resource group, billable PG16/B1ms/32GiB
 dependency, setup administrator and broad network rule. Bicep creates only that
