@@ -27,13 +27,25 @@ fulfillment, stock decrement, persisted order-item/inventory-event rows, and
 review creation/read/deletion. Invalid orders returned 400, insufficient stock
 409, and foreign origins and web reset 403. Synthetic rows were removed and
 the exact original product values and all seed counts restored.
-The hosted test used an internal test-only source upload; **GitHub-source
-deployment is not yet qualified**. Verify your target's identity, grants,
+That mutable hosted test used an internal test-only source upload.
+A separate actual **azd/GitHub-source deployment** subsequently passed initial
+provisioning, SQL bootstrap/grants, source activation, tester-authenticated
+SQL health and seeded reads, default write denial (403), and anonymous
+root/health denial (401). All eight baseline table fingerprints were preserved.
+Its runtime source was
+[`bd1b04d09a6fd48914157f771f48f66b1b2cb184`](https://github.com/seligj95/app-service-builder-postgresql/commit/bd1b04d09a6fd48914157f771f48f66b1b2cb184);
+later hook-only changes have not been activated in that runtime.
+**The azd route is not yet fully qualified:** configured-app infrastructure
+reuse, opt-in hosted CRUD, interrupted pending-operation recovery, and
+post-write app-redeployment persistence remain unverified in this environment.
+These were approved internal East US 2 Builder / West US 2 PostgreSQL tests,
+not qualification of the customer West US 2 Builder target.
+Verify your target's identity, grants,
 visitor access policy, and permitted network path independently.
 No App Service Service Connector, customer VNet integration, private endpoint
 route, or stable outbound IP contract is assumed.
 
-The 45 hosted runtime source entries match contribution commit
+For the earlier source-upload test, the 45 hosted runtime source entries match contribution commit
 `92c26510e45237af0753bb1f4b6629cdd01a9bf8`; their test source archive SHA256 is
 `d5e08379581ca1ee02f7ef4a9cea9223e5db556e77b524d017dfe4efe13d2b4e`.
 Privileged `db/` setup was validated separately against Azure and is excluded
@@ -43,7 +55,20 @@ locally, not repeated in the hosted test.
 
 ## Screenshots
 
-### Hosted Azure PostgreSQL and managed identity
+### GitHub-source azd deployment: read-only
+
+These are actual tester-authenticated captures of the GitHub-source runtime
+identified above, using Azure PostgreSQL, managed identity, and verified TLS.
+Writes remained disabled; these captures do not demonstrate the azd route's
+opt-in order/review mutations or post-write redeployment persistence.
+
+| Workflow | Capture |
+| --- | --- |
+| Seeded dashboard | [GitHub-hosted dashboard](docs/images/shopstream-azd-dashboard.png) |
+| Product browsing | [GitHub-hosted product catalog](docs/images/shopstream-azd-products.png) |
+| Existing seeded orders | [GitHub-hosted orders](docs/images/shopstream-azd-orders.png) |
+
+### Earlier hosted source-upload test: CRUD
 
 These are actual tester-authenticated Builder runtime captures using Entra-only
 Azure PostgreSQL, the app's managed identity, and verified TLS. The order
@@ -90,10 +115,12 @@ and [service connection checklist](https://builder.appservice.azure.com/docs/gui
 
 ## Optional: quick setup with azd
 
-This additional route is **implemented and locally validated, but not yet
-qualified against live GitHub-source Builder deployment**. The manual route
-below remains available. Historical hosted source-upload evidence above does
-not qualify this azd route. Do not run these commands against an existing
+This additional route has passed **live initial provisioning, GitHub-source
+activation, and authenticated read-only checks**, but is **not yet fully
+qualified**; see the remaining gates and internal-region limitation above.
+The manual route below remains available. Historical hosted source-upload CRUD
+evidence does not qualify this azd route's opt-in writes or redeployment
+persistence. Do not run these commands against an existing
 shared resource group, PostgreSQL server, or the previously qualified test app.
 
 Builder has **no native azd host**. [azure.yaml](azure.yaml) deliberately has no
