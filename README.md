@@ -7,7 +7,7 @@ queries run server-side using **Microsoft Entra tokens**, never a stored databas
 password. The default hosted credential is the app's system-assigned managed
 identity; local development uses Azure CLI authentication.
 
-**App Service Builder is Private Preview. This is a DEV/TEST demo without
+**App Service Builder is in Preview. This is a DEV/TEST demo without
 application-level visitor authentication, not an e-commerce production system.**
 Configure Builder's visitor access policy separately. Database authentication does not
 authenticate website visitors. Writes are disabled by default. When explicitly
@@ -99,7 +99,7 @@ Builder activation, or deployed managed-identity connectivity. Names and
 - Node.js **24.x** and npm, Git, Azure CLI, and its Bicep component.
 - An authorized Azure subscription/tenant, PostgreSQL provisioning rights,
   and an Entra user or group authorized to administer this dedicated database.
-- Builder preview access with **Node.js compute activation** in **West US 2
+- Permission to create and deploy a Builder app with **Node.js 24 support** in **West US 2
   (`westus2`), the customer target region for this sample**; an authorized GitHub
   source repository. Use West US 2 for PostgreSQL as well. Historical East US 2
   test deployments are internal qualification only, not a public region choice.
