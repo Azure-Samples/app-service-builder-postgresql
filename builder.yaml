@@ -1,0 +1,9 @@
+components:
+  - name: web
+    role: web
+    platform: nodejs
+    platformVersion: "24"
+    build: npm ci && npm run build && npm run package
+    run:
+      start: node server/index.js
+      healthCheckPath: /health

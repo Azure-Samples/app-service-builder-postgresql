@@ -1,0 +1,28 @@
+{
+  "name": "app-service-builder-postgresql",
+  "version": "2.0.0",
+  "description": "ShopStream - Multi-Vendor E-Commerce Marketplace Demo",
+  "private": true,
+  "scripts": {
+    "start": "node server/index.js",
+    "build": "npm ci --prefix client && npm run build --prefix client",
+    "dev": "concurrently \"npm run dev --prefix client\" \"node --watch server/index.js\"",
+    "package": "node scripts/package.js",
+    "db:bootstrap": "node db/setup.js bootstrap",
+    "db:reset": "node db/setup.js reset",
+    "db:grant": "node db/setup.js grant",
+    "test": "node --test test/*.test.js",
+    "test:integration": "node --test test/integration/*.test.js"
+  },
+  "dependencies": {
+    "@azure/identity": "^4.14.1",
+    "express": "^4.22.3",
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": "24.x"
+  }
+}
