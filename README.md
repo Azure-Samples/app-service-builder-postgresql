@@ -28,16 +28,15 @@ review creation/read/deletion. Invalid orders returned 400, insufficient stock
 409, and foreign origins and web reset 403. Synthetic rows were removed and
 the exact original product values and all seed counts restored.
 That mutable hosted test used an internal test-only source upload.
-A separate actual **azd/GitHub-source deployment** subsequently passed initial
+A separate actual **GitHub-source deployment** subsequently passed initial
 provisioning, SQL bootstrap/grants, source activation, tester-authenticated
 SQL health and seeded reads, default write denial (403), and anonymous
 root/health denial (401). All eight baseline table fingerprints were preserved.
 Its runtime source was
 [`bd1b04d09a6fd48914157f771f48f66b1b2cb184`](https://github.com/seligj95/app-service-builder-postgresql/commit/bd1b04d09a6fd48914157f771f48f66b1b2cb184);
-later hook-only changes have not been activated in that runtime.
-**The azd route is not yet fully qualified:** configured-app infrastructure
-reuse, opt-in hosted CRUD, interrupted pending-operation recovery, and
-post-write app-redeployment persistence remain unverified in this environment.
+These are historical runtime observations, not qualification of every later
+source change. Opt-in CRUD was not repeated in this GitHub-source environment;
+post-write hosted app-redeployment persistence remains unverified.
 These were approved internal East US 2 Builder / West US 2 PostgreSQL tests,
 not qualification of the customer West US 2 Builder target.
 Verify your target's identity, grants,
@@ -55,18 +54,18 @@ locally, not repeated in the hosted test.
 
 ## Screenshots
 
-### GitHub-source azd deployment: read-only
+### GitHub-source deployment: read-only
 
 These are actual tester-authenticated captures of the GitHub-source runtime
 identified above, using Azure PostgreSQL, managed identity, and verified TLS.
-Writes remained disabled; these captures do not demonstrate the azd route's
+Writes remained disabled; these captures do not demonstrate this runtime's
 opt-in order/review mutations or post-write redeployment persistence.
 
 | Workflow | Capture |
 | --- | --- |
-| Seeded dashboard | [GitHub-hosted dashboard](docs/images/shopstream-azd-dashboard.png) |
-| Product browsing | [GitHub-hosted product catalog](docs/images/shopstream-azd-products.png) |
-| Existing seeded orders | [GitHub-hosted orders](docs/images/shopstream-azd-orders.png) |
+| Seeded dashboard | [GitHub-hosted dashboard](docs/images/shopstream-github-dashboard.png) |
+| Product browsing | [GitHub-hosted product catalog](docs/images/shopstream-github-products.png) |
+| Existing seeded orders | [GitHub-hosted orders](docs/images/shopstream-github-orders.png) |
 
 ### Earlier hosted source-upload test: CRUD
 
@@ -112,243 +111,6 @@ See the maintained [manifest reference](https://builder.appservice.azure.com/doc
 [runtimes](https://builder.appservice.azure.com/docs/reference/runtimes/),
 [managed identity guide](https://builder.appservice.azure.com/docs/guides/managed-identity/),
 and [service connection checklist](https://builder.appservice.azure.com/docs/guides/connect-to-services/).
-
-## Optional: quick setup with azd
-
-This additional route has passed **live initial provisioning, GitHub-source
-activation, and authenticated read-only checks**, but is **not yet fully
-qualified**; see the remaining gates and internal-region limitation above.
-The manual route below remains available. Historical hosted source-upload CRUD
-evidence does not qualify this azd route's opt-in writes or redeployment
-persistence. Do not run these commands against an existing
-shared resource group, PostgreSQL server, or the previously qualified test app.
-
-Builder has **no native azd host**. [azure.yaml](azure.yaml) deliberately has no
-services. **Run the explicit preprovision bootstrap before every `azd up`**
-as shown below: native up initialization can resolve Bicep parameters before
-entering any custom workflow. The custom workflow repeats `hooks run preprovision`,
-then runs `provision` and `hooks run predeploy`; its repeated hook is a guard,
-not a replacement for explicit bootstrap. It also refreshes create-versus-reuse
-mode before native parameter caching so a rerun does not PUT an already
-configured Builder app. The complete Builder deployment lives in
-[scripts/azd.ps1](scripts/azd.ps1). **Use the explicit hook for redeployment,
-not `azd deploy --all`.** In the credential-isolated azd 1.29.0 fixture,
-the explicit hook executed, whereas native deploy attempted authentication
-before its hooks. The fixture rejected all network traffic locally; it did
-not contact Azure or demonstrate cloud provisioning.
-
-### Tools, identity, and explicit inputs
-
-In addition to the prerequisites above, install azd **1.29.0 or later**,
-**PowerShell 7.4 or later** (also on macOS/Linux), GitHub CLI, and a compatible
-[published Builder preview CLI](https://builder.appservice.azure.com/docs/reference/builder-cli/).
-The hooks check needed CLI capabilities, not just its version stamp: GitHub
-source connect, full-commit/request-ID deployment, operation status, and
-served-version provenance. They never install or upgrade the CLI. Local checks
-used Node 24.8.0, Azure CLI 2.87.0/Bicep 0.46.1, azd 1.29.0, PowerShell 7.5.2,
-and GitHub CLI 2.102.1 on macOS. A Windows execution is still required before
-claiming Windows qualification.
-
-Fork and clone this sample, push the branch/commit you intend Builder to build,
-and run `npm ci` in the repository root. Azure CLI, azd, Builder, and GitHub have
-separate authentication stores. Sign in interactively as needed:
-
-```powershell
-azd auth login --tenant-id "<tenant-id>"
-az login --tenant "<tenant-id>"
-builder login --tenant "<tenant-id>"
-builder source login github --account "<github-login>"
-```
-
-Select the same GitHub account in GitHub CLI; the hook refuses an active-account
-mismatch rather than silently switching accounts. GitHub App installation,
-repository authorization, organization approval and browser consent remain
-human actions. No password, GitHub token, Azure token or signed source URL
-belongs in the azd environment.
-
-**Before provisioning**, have the repository owner grant the official Builder
-GitHub App access to **your fork**, following the maintained
-[GitHub authorization requirements](https://builder.appservice.azure.com/docs/guides/source-control/#github-authorization).
-Public forks also require installation access; `builder source login github`
-does not install the App. Review the publisher, owning account and exact selected
-repositories rather than granting access to all repositories. A successful
-GitHub CLI sign-in alone does not establish Builder source access.
-
-In PowerShell 7, create a **new** environment and configure explicit targets:
-
-```powershell
-azd env new shopstream-demo
-azd env set AZURE_SUBSCRIPTION_ID "<subscription-id>"
-azd env set AZURE_TENANT_ID "<tenant-id>"
-azd env set AZURE_LOCATION "westus2"
-azd env set PG_LOCATION "westus2"
-azd env set PG_SERVER "asb-pg-<globally-unique-suffix>"
-azd env set ADMIN_OBJECT_ID "<bootstrap-admin-object-id>"
-azd env set ADMIN_NAME "<bootstrap-admin-upn-or-group-name>"
-azd env set ADMIN_TYPE "User" # or Group
-azd env set BUILDER_ALLOWED_OBJECT_IDS "<tester-object-id>,<optional-second-tester-object-id>"
-azd env set GITHUB_REPOSITORY "<owner>/<fork>"
-azd env set GITHUB_REF_NAME "<pushed-branch>"
-azd env set GITHUB_SHA "<full-reviewed-40-character-pushed-commit>"
-azd env set GITHUB_ACCOUNT "<github-login>"
-```
-
-`AZURE_ENV_NAME` is azd's standard environment name (3-20 lowercase
-letters/digits/hyphens). The source root is fixed to `.`. `AZURE_LOCATION` and
-`PG_LOCATION` both default to and must target **West US 2** for customers; verify
-admission, quota, cost and permissions before provisioning. An operator-only
-`SAMPLE_INTERNAL_TEST_ALLOW_EASTUS2=true` override exists solely to preserve
-explicitly approved internal tests; it is not a customer region option and is
-never added to the runtime configuration. The named administrator needs existing Entra
-SQL access from the caller's reachable environment. The hook does not create
-a Cloud Shell, VM, bootstrap host, password or new Azure role assignment.
-The runtime is never the database administrator.
-
-**Network decision:** this fast path requires explicit DEV/TEST opt-in to the
-PostgreSQL Azure-services exception. It admits Azure-origin workloads **across
-subscriptions and tenants**, not just your Builder app. It is not an
-all-internet rule or production isolation. Set the following only after reviewing
-and accepting that scope; the default is false and the hook otherwise stops:
-
-```powershell
-azd env set SHOPSTREAM_ALLOW_AZURE_SERVICES true
-# If needed for the existing administrator's workstation, approve ONE exact IP:
-azd env set BOOTSTRAP_IPV4 "<approved-nonzero-public-ipv4>"
-```
-
-The administrator must actually be reachable under the approved rules.
-If not, setup stops without a deployment or another network workaround.
-Disabling a Bicep condition does not remove a previously created firewall rule;
-the hook rejects that drift and requires separately reviewed targeted removal.
-
-### Provision, deploy, and observe
-
-```powershell
-# Required before EVERY up: generate owner/name parameters and refresh reuse mode.
-azd hooks run preprovision -e shopstream-demo
-azd up -e shopstream-demo --subscription "<subscription-id>" --location "westus2"
-```
-
-If up unexpectedly prompts for `appName`, `ownerId` or another derived
-infrastructure parameter, cancel rather than inventing a value. Run the
-explicit preprovision bootstrap for the same named environment, then rerun up.
-Do not delete its ownership receipt or adopt existing/shared resources.
-
-Preprovision reviews the exact owned resource group, billable PG16/B1ms/32GiB
-dependency, setup administrator and broad network rule. Bicep creates only that
-new dedicated group, Entra-only PG and source-less system-identity Builder app.
-Postprovision applies a required tenant-and-object-ID tester policy, runs the
-existing idempotent schema/seed bootstrap and nonadmin principal grants, and
-verifies them. Predeploy reviews GitHub credential transfer and the full source
-commit, saves nonsecret runtime configuration, submits one request-ID-bound
-deployment, resumes its operation, and checks active-version GitHub provenance.
-Existing schemas are not reset, and ambiguous source/deployment outcomes are
-never blindly retried.
-
-The hook preserves verified TLS, runtime least privilege and tester-only
-access. **Demo writes remain false.** If intentionally opting in later, set
-`SHOPSTREAM_ENABLE_DEMO_WRITES=true` and `SHOPSTREAM_PUBLIC_ORIGIN` to the exact
-actual HTTPS `BUILDER_APP_URL` origin, without a trailing slash/path. An invalid
-or mismatched origin stops before deployment; forwarded headers are not trusted.
-
-Successful rollout is **not** authenticated SQL health or CRUD qualification.
-The PowerShell hook exports separate stage statuses and ends with exit **3** when protected
-health requires browser verification: `Deployment=Succeeded`,
-`BUILDER_HEALTH_STATUS=AwaitingInteractiveVerification`,
-`SHOPSTREAM_CRUD_STATUS=NotRun`. Sign in as an allowed tester, handle any consent
-yourself, and verify `/health`, seeded reads and the validation steps below.
-Do not weaken the visitor policy or copy browser cookies into scripts.
-
-In the live azd **1.29.0** test, `azd hooks run predeploy` wrapped this child
-exit 3 as outer exit **1**. Inspect the stage outputs and saved operation rather
-than treating the outer exit alone as rollout failure or readiness. A succeeded
-rollout awaiting browser verification must not be redeployed to finish sign-in.
-
-Redeploy a deliberately reviewed source/configuration change using:
-
-```powershell
-azd hooks run predeploy -e shopstream-demo
-```
-
-A pending operation is observed first. Repeating the same completed `GITHUB_SHA`
-is observe-only, even if local configuration changed; applying new configuration
-requires an explicitly reviewed different pushed commit. It never silently
-reconfigures or redeploys a completed commit.
-Terminal failure/cancellation from native `builder app status --json` is
-journaled even when that command exits nonzero; a bounded service error code is
-retained when available. Failed operations stop for review, not automatic retry.
-Observe an existing receipt without source/SQL/configuration mutation using:
-
-```powershell
-pwsh -NoProfile -File scripts/azd.ps1 verify -Environment shopstream-demo
-```
-
-Before **every** standalone preview or infrastructure/setup command, initialize
-the guarded parameters and refresh create-versus-reuse mode first (native
-preprovision hooks run too late for native parameter caching):
-
-```powershell
-azd hooks run preprovision -e shopstream-demo
-azd provision --preview -e shopstream-demo --subscription "<subscription-id>" --location "westus2"
-# After reviewing the preview:
-azd hooks run preprovision -e shopstream-demo
-azd provision -e shopstream-demo --subscription "<subscription-id>" --location "westus2"
-```
-
-Deploy/down
-derive their target from the explicitly validated named environment; no
-unsupported subscription flag or Azure CLI global-default change is used.
-
-If azd cannot resolve the pinned subscription despite a successful
-`az account show --subscription "<subscription-id>"`, an existing azd account
-cache can be stale. Operators already signed in through Azure CLI can use the
-supported isolated configuration below, retaining it for **every** subsequent
-azd command in that shell. This selects existing Azure CLI credentials, not a
-new identity or permission grant; it is optional troubleshooting, not a sample
-prerequisite. Do not copy tokens or edit credential/cache files manually.
-
-```powershell
-$env:AZD_CONFIG_DIR = Join-Path (Get-Location) '.azure/azd-operator-config'
-azd config set auth.useAzCliAuth true
-```
-
-Outputs include `AZURE_RESOURCE_GROUP`, `PGHOST`, `PGDATABASE`, runtime `PGUSER`,
-`PG_SERVER_ID`, and `BUILDER_APP_NAME`, `BUILDER_APP_RESOURCE_ID`,
-`BUILDER_APP_PRINCIPAL_ID`, `BUILDER_APP_URL`, `BUILDER_APP_DEPLOYMENT_ID`,
-`BUILDER_APP_VERSION_ID`. Separate stage outputs are
-`SHOPSTREAM_DATABASE_SETUP_STATUS` (administrator-side schema/grant check, not
-deployed SQL health), `BUILDER_SOURCE_STATUS`, `BUILDER_DEPLOYMENT_STATUS`, `BUILDER_AUTH_STATUS`,
-`BUILDER_HEALTH_STATUS`, `SHOPSTREAM_VERIFICATION_STATUS` and
-`SHOPSTREAM_CRUD_STATUS`. Preserve `.azure/<environment>/shopstream-state.json`
-and azd's local environment: they contain nonsecret ownership/source/operation
-receipts needed for recovery and guarded cleanup. Do not publish private
-environment identities or receipts.
-
-### Cleanup and local checks
-
-`azd down -e shopstream-demo` is a **separate destructive decision**. It deletes
-the entire newly owned group/app/PostgreSQL server, including SQL roles, seed
-and any added data. Predown verifies the exact saved latest terminal azd
-deployment/template hash, recursively allowlists nested deployment resources,
-checks actual group/database/firewall inventory, and requires a typed
-confirmation before native azd's deletion prompt. Missing receipts, changed
-ownership, foreign resources, unresolved rollout or ambiguous deployment
-discovery block cleanup. Do not use `--force`, `--purge`, skip hooks, or aim it
-at a shared group. Partial provisioning with unverifiable deployment metadata
-requires reviewed exact-resource recovery instead.
-
-App deletion alone leaves PostgreSQL and its principal mapping behind.
-This route does not delete your fork, uninstall a GitHub App, clear credentials,
-or clean roles on an external/retained database.
-
-`npm test` covers existing behavior; `npm run test:azd` adds actual isolated azd
-hook execution, input/SQL fixtures and mocked PowerShell ownership, native
-process, authorization and operation-recovery checks. Local Bicep compilation
-has preview resource-metadata warnings; it does not replace provider validation.
-**Still required before live qualification:** fresh approved target/quota/cost/
-permissions and what-if, reachable Entra bootstrap, actual GitHub authorization,
-deployment, active-source provenance, tester SSO, SQL health and separately
-approved reversible CRUD/persistence/cleanup. None was executed by local tests.
 
 ## 1. Provision the database dependency
 
@@ -467,7 +229,7 @@ To deliberately restore the entire synthetic dataset, stop the demo app first,
 connect as the bootstrap administrator, and explicitly confirm the database:
 
 ```sh
-SHOPSTREAM_CONFIRM_RESET="$PGDATABASE" npm run db:reset
+PGUSER="$ADMIN_NAME" SHOPSTREAM_CONFIRM_RESET="$PGDATABASE" npm run db:reset
 ```
 
 This replaces **all eight tables' data**, resets sequences, and reseeds within
@@ -475,13 +237,46 @@ one transaction. It uses no `CASCADE`. `POST /api/reset` always returns **403**;
 the web identity has no `TRUNCATE`, schema ownership, or migration privileges.
 Only use reset on this dedicated sample database.
 
-## 3. Map least-privilege Entra runtime and developer principals
+## 3. Create the Builder app and map least-privilege principals
 
-Enable a **system-assigned identity** on the Builder app's Identity page and
-choose **Save and deploy**. Record its **principal/object ID**. Identity
-assignment alone grants neither SQL permissions nor network access. If the
-first app deployment cannot pass health before granting database access, save
-the identity, map it below, and retry the deployment after configuration.
+Fork this sample and push your intended branch, including the root
+`builder.yaml`. In [Builder Portal](https://builder.appservice.azure.com/),
+select your subscription and **Create**. Follow the
+[Portal quickstart](https://builder.appservice.azure.com/docs/quickstarts/portal/):
+choose **Use my repository**, your fork and branch, and **Let Builder handle it**.
+Portal creation uses the repository root.
+
+GitHub sign-in and GitHub App installation are separate requirements. Grant the
+official [App Service Builder GitHub App](https://github.com/apps/app-service-builder)
+(developer **AzureAppService**) access to **your selected fork**, including
+public forks. Review the publisher, owning account, exact repository and OAuth
+permissions; do not grant all-repository access merely to deploy this sample.
+See the maintained
+[GitHub authorization requirements](https://builder.appservice.azure.com/docs/guides/source-control/#github-authorization)
+for organization approval and SSO.
+
+In **Access**, enable a **system-assigned identity** and apply required
+work-account sign-in. In **App details**, select the same intended subscription,
+your approved sample resource group, and **West US 2** for the app. Review these
+choices before **Create and deploy**. Record the app's resource ID.
+Creating the app requests an initial deployment; it cannot pass the sample's
+SQL health check until the variables and principal grants below are in place.
+An initial missing-configuration/readiness failure is not a successful serving
+deployment. Configure and redeploy this same app; do not create a duplicate.
+
+On the existing app's **Identity** page, record its **principal/object ID**.
+If you did not enable the identity during creation, enable it there and choose
+**Save and deploy**. Assignment alone grants neither SQL permissions nor network
+access. It can be saved before usable build output exists; apply the grants
+below before expecting a successful runtime.
+
+On **Authentication**, set **Sign-in** to **Required**, enable
+**Microsoft Entra ID**, and use **Limit to specific identities** with the
+intended tenant ID and exact tester object IDs. **Save** and **Test sign-in**;
+a tenant-only rule permits everyone in that tenant. Review sign-in and
+identity-sharing consent personally. Follow the
+[authentication guide](https://builder.appservice.azure.com/docs/guides/authentication/)
+without weakening access rules to bypass a sign-in failure.
 
 While still connected as the bootstrap administrator:
 
@@ -562,10 +357,15 @@ selection from the trusted SDK token output; `az login --tenant` selects the
 intended directory before you run it.
 
 ```sh
+export PGUSER=shopstream_developer
 npm test
 npm run build
 HOST=127.0.0.1 PORT=8186 node --env-file=.env server/index.js
 ```
+
+Existing shell variables take precedence over `--env-file`; the explicit
+`PGUSER` change prevents the earlier bootstrap administrator from leaking into
+the local web process. Keep `.env` consistent with the same limited role.
 
 Open `http://127.0.0.1:8186` in Microsoft Edge. `/health` queries PostgreSQL and
 returns **200** only when connectivity/authentication succeed, otherwise **503**.
@@ -608,15 +408,26 @@ Reaching a limit returns **409**, never auto-resets or deletes data.
 
 Integration tests require a real seeded PostgreSQL database and an explicitly
 confirmed dedicated test target; see `test/integration/crud.test.js`. They create
-one order, advance its status, and create/delete their own review. No
-production fallback or in-memory database is used.
+one order, advance its status, and create/delete their own review. With your
+limited developer login and a disposable seeded target in `.env`, run:
+
+```sh
+SHOPSTREAM_INTEGRATION_DB=shopstream node --env-file=.env --test test/integration/crud.test.js
+```
+
+The order and stock change intentionally remain for process-restart assertions;
+restore the dedicated dataset through the administrator-only reset above when
+finished, not through the web app. No production fallback or in-memory database
+is used.
 
 ## 5. Deploy your committed source with Builder
 
-Fork the published sample into an authorized GitHub account, or publish this
-source to the approved sample repository. Select the **repository root** and
-your committed branch in [Builder Portal](https://builder.appservice.azure.com/).
-Do not point Builder at the original legacy deployment manifest.
+Return to the app created in step 3. Verify its connected fork, committed branch
+and repository root under **Settings → Source Control**. Keep **Automatic
+deployments** off under **Settings → Deployment Settings**: native push delivery
+and the **Use GitHub Actions** approach are not available in this preview.
+Push a reviewed commit, then deploy explicitly. Do not point Builder at the
+original legacy deployment manifest.
 
 The root `builder.yaml` declares exactly one **web** component, Node.js **24**,
 `run.start: node server/index.js`, and health path `/health`. It retains the
@@ -664,11 +475,29 @@ For tester-only validation, enforce Builder's required Entra visitor policy
 before enabling writes. Review any sign-in or application-consent prompt
 personally; database managed identity does not replace visitor access control.
 
-Choose **Save and deploy** to capture variables in a new version. **Save only**
+Use the app's **Variables** page, then choose **Save and deploy** to capture variables in a new version. **Save only**
 does not update running code. Retained versions use historical settings. Wait
-for successful deployment, then repeat `/health`, dashboard reads, CRUD, and
-restart/redeploy persistence checks against the **actual runtime URL**. This is
-the qualification required for deployed managed identity and network access.
+for successful deployment and inspect the active version's exact GitHub source
+revision. Open **Overview → Browse**, sign in as an allowed tester, and check
+the **actual runtime URL**: `/health` must return 200 with `status: healthy`,
+and dashboard/products/orders must read seeded database rows. Before enabling
+writes, verify an order POST is denied with 403 and an anonymous root/health
+request is denied with 401. A protected health endpoint returning 401 to an
+anonymous client is not a database failure; check it in the authenticated
+browser instead. Do not export session cookies or redeploy merely to finish
+sign-in.
+
+For a separately approved bounded mutation test, set
+`SHOPSTREAM_ENABLE_DEMO_WRITES=true` and `SHOPSTREAM_PUBLIC_ORIGIN` to the exact
+runtime origin in Variables, **Save and deploy**, then use the UI to create one
+test order, advance it once to processing, and create/read/delete one review.
+Record the returned IDs. Use the same signed-in browser for API checks; the
+local unauthenticated curl walkthrough is not an authenticated hosted recipe.
+Deploy a reviewed subsequent version and read the same order ID to test
+post-redeployment persistence. Restore `SHOPSTREAM_ENABLE_DEMO_WRITES=false` with **Save and deploy**
+after testing. These are customer verification steps, not claims that all were
+repeated in the historical GitHub-source qualification above.
+Successful authenticated checks qualify deployed managed identity and network access.
 The CI workflow runs local tests/build only; it does not deploy or bootstrap.
 
 ## Authentication, TLS, errors, and troubleshooting
@@ -721,18 +550,10 @@ memory; use this bounded dataset rather than a million-row seed.
 
 Stop local processes with Ctrl+C. When finished, delete only the owned Builder
 sample app through Portal and confirm deletion. App deletion does **not**
-delete PostgreSQL or a user-assigned identity. After separately approving
-dependency cleanup:
-
-```sh
-az postgres flexible-server delete --name "$PG_SERVER" --resource-group "$RG" \
-  --subscription "$AZURE_SUBSCRIPTION_ID"
-# Only if you created this optional identity for the sample:
-az identity delete --name asb-pg-runtime --resource-group "$RG" \
-  --subscription "$AZURE_SUBSCRIPTION_ID"
-```
-
-Remove the workstation firewall rule when no longer needed:
+delete PostgreSQL or a user-assigned identity. If retaining the database, reset
+only this dedicated synthetic dataset as described above if needed.
+After separately approving dependency cleanup, remove the workstation firewall
+rule while the server still exists:
 
 ```sh
 az postgres flexible-server firewall-rule delete --server-name "$PG_SERVER" --resource-group "$RG" \
@@ -745,6 +566,18 @@ specific rule when finished as well. This can stop the demo's database access:
 ```sh
 az postgres flexible-server firewall-rule delete --server-name "$PG_SERVER" --resource-group "$RG" \
   --name devtest-allow-azure-services --subscription "$AZURE_SUBSCRIPTION_ID"
+```
+
+If deleting the dedicated database server, this removes its databases, SQL
+roles and all demo data. Delete the optional user-assigned identity only if it
+was created solely for this sample:
+
+```sh
+az postgres flexible-server delete --name "$PG_SERVER" --resource-group "$RG" \
+  --subscription "$AZURE_SUBSCRIPTION_ID"
+# Only if you created this optional identity for the sample:
+az identity delete --name asb-pg-runtime --resource-group "$RG" \
+  --subscription "$AZURE_SUBSCRIPTION_ID"
 ```
 
 Do **not** delete a shared resource group, unrelated resources, or source forks
